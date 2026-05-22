@@ -1,16 +1,18 @@
 # src/ui/nutrition_tab.py
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QVBoxLayout
 
+from src.managers.ingredient_manager import IngredientManager
+from src.ui.nutrition_ingredient_list import NutritionIngredientList
+
+
 class NutritionTab(QWidget):
     def __init__(self):
         super().__init__()
         layout = QHBoxLayout(self)
 
         # 左栏 - 食材列表
-        left = QVBoxLayout()
-        left.addWidget(QLabel("食材列表"))
-        left_w = QWidget()
-        left_w.setLayout(left)
+        self._ingredient_list = NutritionIngredientList()
+        layout.addWidget(self._ingredient_list, 1)
 
         # 中栏 - 匹配操作
         center = QVBoxLayout()
@@ -24,6 +26,8 @@ class NutritionTab(QWidget):
         right_w = QWidget()
         right_w.setLayout(right)
 
-        layout.addWidget(left_w, 1)
         layout.addWidget(center_w, 1)
         layout.addWidget(right_w, 1)
+
+    def set_ingredient_manager(self, mgr: IngredientManager) -> None:
+        self._ingredient_list.set_ingredient_manager(mgr)
