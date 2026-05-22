@@ -1,2 +1,0 @@
-[console_scripts]
-howtocook-organizer = src.ui.main:main
