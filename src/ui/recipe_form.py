@@ -5,8 +5,11 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,
     QFormLayout,
+    QGridLayout,
     QScrollArea,
+    QSplitter,
     QLineEdit,
     QComboBox,
     QSpinBox,
@@ -15,9 +18,10 @@ from PySide6.QtWidgets import (
     QPushButton,
     QHeaderView,
     QGroupBox,
-    QHBoxLayout,
+    QLabel,
     QSizePolicy,
     QCompleter,
+    QMessageBox,
 )
 
 # ---------------------------------------------------------------------------
@@ -44,8 +48,8 @@ CATEGORY_OPTIONS = [
 INGREDIENT_COLUMNS = ["食材名称", "关联", "数量", "单位", "范围(最小)", "范围(最大)", "用量描述", "是否可选", "备注"]
 
 QTY_DESC_OPTIONS = ["", "适量", "少许"]
-STEP_COLUMNS = ["序号", "描述", "用时(分钟)", "备注"]
-TIP_COLUMNS = ["序号", "内容"]
+STEP_COLUMNS = ["描述", "用时(分钟)", "备注"]
+TIP_COLUMNS = ["内容"]
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +67,9 @@ class RecipeForm(QWidget):
         self._dirty = False
         self._im = None  # IngredientManager reference
         self._um = None  # UnitManager reference
+        self._fm = None  # FileManager reference
+        self._source_path: str | None = None
+        self._approx_values = {}  # row_id -> {2: text, 3: unit_text, 4: min, 5: max}
         self._build_ui()
         self._connect_change_signals()
 
@@ -74,62 +81,143 @@ class RecipeForm(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
-        container = QWidget()
-        self._layout = QVBoxLayout(container)
-        self._layout.setContentsMargins(6, 6, 6, 6)
-        self._layout.setSpacing(8)
-
+        # Build all groups first
         self._add_basic_info_section()
         self._add_ingredients_section()
         self._add_steps_section()
         self._add_tips_section()
+        self._add_images_section()
         self._add_bottom_buttons()
 
-        self._layout.addStretch()
-        scroll.setWidget(container)
-        outer.addWidget(scroll)
+        # --- layout ---
+        # Top: basic info (fixed height)
+        outer.addWidget(self._basic_group)
+
+        # Middle: vertical splitter for Ingredients : Steps : [Tips+Images]
+        main_splitter = QSplitter(Qt.Orientation.Vertical)
+        main_splitter.setChildrenCollapsible(False)
+        main_splitter.addWidget(self._ingredients_group)
+        main_splitter.addWidget(self._steps_group)
+
+        # Bottom row: tips + images side by side
+        bottom_row = QSplitter(Qt.Orientation.Horizontal)
+        bottom_row.setChildrenCollapsible(False)
+        bottom_row.addWidget(self._tips_group)
+        bottom_row.addWidget(self._images_group)
+
+        main_splitter.addWidget(bottom_row)
+
+        # Height ratio: Ingredients=2, Steps=2, Bottom=1
+        main_splitter.setStretchFactor(0, 2)
+        main_splitter.setStretchFactor(1, 2)
+        main_splitter.setStretchFactor(2, 1)
+
+        outer.addWidget(main_splitter)
+        outer.addWidget(self._buttons_widget)
 
     # --- Basic info -------------------------------------------------------
 
     def _add_basic_info_section(self):
-        group = QGroupBox("基本信息")
-        form = QFormLayout(group)
+        self._basic_group = QGroupBox("基本信息")
+        grid = QGridLayout(self._basic_group)
+        for c in (1, 3, 5):
+            grid.setColumnStretch(c, 2)
 
         self.name_edit = QLineEdit()
         self.name_edit.setPlaceholderText("菜谱名称")
-        form.addRow("名称:", self.name_edit)
+        grid.addWidget(self._label("名称:"), 0, 0)
+        grid.addWidget(self.name_edit, 0, 1)
 
         self.difficulty_combo = QComboBox()
         self.difficulty_combo.addItems(DIFFICULTY_OPTIONS)
         self.difficulty_combo.setEditable(True)
-        form.addRow("难度:", self.difficulty_combo)
+        grid.addWidget(self._label("难度:"), 0, 2)
+        grid.addWidget(self.difficulty_combo, 0, 3)
 
         self.category_combo = QComboBox()
         self.category_combo.addItems(CATEGORY_OPTIONS)
         self.category_combo.setEditable(True)
-        form.addRow("分类:", self.category_combo)
+        grid.addWidget(self._label("分类:"), 0, 4)
+        grid.addWidget(self.category_combo, 0, 5)
 
         self.servings_spin = QSpinBox()
         self.servings_spin.setRange(1, 9999)
         self.servings_spin.setValue(1)
-        form.addRow("份量:", self.servings_spin)
+        grid.addWidget(self._label("份量:"), 0, 6)
+        grid.addWidget(self.servings_spin, 0, 7)
 
-        self.original_servings_spin = QSpinBox()
-        self.original_servings_spin.setRange(1, 9999)
-        self.original_servings_spin.setValue(1)
-        form.addRow("原始份量:", self.original_servings_spin)
+    @staticmethod
+    def _label(text: str) -> QLabel:
+        """Create a right-aligned label."""
+        lbl = QLabel(text)
+        lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        return lbl
 
-        self._layout.addWidget(group)
+    # --- Images ------------------------------------------------------------
+
+    IMAGE_COLUMNS = ["URL"]
+
+    def _add_images_section(self):
+        self._images_group = QGroupBox("图片")
+        vbox = QVBoxLayout(self._images_group)
+
+        btn_row = QHBoxLayout()
+        self.add_image_btn = QPushButton("添加图片")
+        self.remove_image_btn = QPushButton("删除选中")
+        btn_row.addWidget(self.add_image_btn)
+        btn_row.addWidget(self.remove_image_btn)
+        btn_row.addStretch()
+        vbox.addLayout(btn_row)
+
+        self.images_table = QTableWidget(0, len(self.IMAGE_COLUMNS))
+        self.images_table.setHorizontalHeaderLabels(self.IMAGE_COLUMNS)
+        header = self.images_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.images_table.setSelectionBehavior(
+            QTableWidget.SelectionBehavior.SelectItems
+        )
+        self.images_table.setSelectionMode(
+            QTableWidget.SelectionMode.ExtendedSelection
+        )
+        self.images_table.setEditTriggers(
+            QTableWidget.EditTrigger.CurrentChanged
+            | QTableWidget.EditTrigger.DoubleClicked
+            | QTableWidget.EditTrigger.EditKeyPressed
+        )
+        self.images_table.setMinimumHeight(60)
+        vbox.addWidget(self.images_table)
+
+        self.add_image_btn.clicked.connect(self._add_image_row)
+        self.remove_image_btn.clicked.connect(self._remove_image_row)
+
+    def _add_image_row(self, url: str = ""):
+        row = self.images_table.rowCount()
+        self.images_table.insertRow(row)
+        self.images_table.setItem(row, 0, QTableWidgetItem(url))
+
+    def _remove_image_row(self):
+        rows = sorted(
+            set(idx.row() for idx in self.images_table.selectedIndexes()),
+            reverse=True,
+        )
+        for r in rows:
+            self.images_table.removeRow(r)
+
+    def _collect_images(self) -> list[str]:
+        urls = []
+        for row in range(self.images_table.rowCount()):
+            item = self.images_table.item(row, 0)
+            if item:
+                url = item.text().strip()
+                if url:
+                    urls.append(url)
+        return urls
 
     # --- Ingredients ------------------------------------------------------
 
     def _add_ingredients_section(self):
-        group = QGroupBox("食材")
-        vbox = QVBoxLayout(group)
+        self._ingredients_group = QGroupBox("食材")
+        vbox = QVBoxLayout(self._ingredients_group)
 
         # Buttons row
         btn_row = QHBoxLayout()
@@ -152,14 +240,7 @@ class RecipeForm(QWidget):
         self.ingredients_table = QTableWidget(0, len(INGREDIENT_COLUMNS))
         self.ingredients_table.setHorizontalHeaderLabels(INGREDIENT_COLUMNS)
         header = self.ingredients_table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(7, QHeaderView.ResizeMode.Fixed)
-        self.ingredients_table.setColumnWidth(1, 50)
-        self.ingredients_table.setColumnWidth(6, 70)
-        self.ingredients_table.setColumnWidth(7, 50)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.ingredients_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectItems
         )
@@ -183,13 +264,17 @@ class RecipeForm(QWidget):
         self.ingredient_up_btn.clicked.connect(lambda: self._move_row(self.ingredients_table, -1))
         self.ingredient_down_btn.clicked.connect(lambda: self._move_row(self.ingredients_table, 1))
 
-        self._layout.addWidget(group)
-
     def _add_ingredient_row(self):
         row = self.ingredients_table.rowCount()
         self.ingredients_table.insertRow(row)
-        # Unit combo box
+        # 数量 (col 2)
+        self.ingredients_table.setItem(row, 2, QTableWidgetItem(""))
+        # Unit combo box (col 3)
         self.ingredients_table.setCellWidget(row, 3, self._create_unit_combo())
+        # 范围(最小) (col 4)
+        self.ingredients_table.setItem(row, 4, QTableWidgetItem(""))
+        # 范围(最大) (col 5)
+        self.ingredients_table.setItem(row, 5, QTableWidgetItem(""))
         # "用量描述" combo (col 6)
         self.ingredients_table.setCellWidget(row, 6, self._create_qty_desc_combo())
         # "是否可选" checkbox (col 7)
@@ -210,13 +295,15 @@ class RecipeForm(QWidget):
     # --- Steps ------------------------------------------------------------
 
     def _add_steps_section(self):
-        group = QGroupBox("步骤")
-        vbox = QVBoxLayout(group)
+        self._steps_group = QGroupBox("步骤")
+        vbox = QVBoxLayout(self._steps_group)
 
         # Buttons row
         btn_row = QHBoxLayout()
         self.add_step_btn = QPushButton("添加步骤")
         self.remove_step_btn = QPushButton("删除选中")
+        self.import_steps_btn = QPushButton("快速导入")
+        self.import_steps_btn.setToolTip("从 MD 文件导入步骤（每行一条，覆盖已有数据）")
         self.step_up_btn = QPushButton("▲")
         self.step_up_btn.setFixedWidth(30)
         self.step_up_btn.setToolTip("上移")
@@ -225,6 +312,7 @@ class RecipeForm(QWidget):
         self.step_down_btn.setToolTip("下移")
         btn_row.addWidget(self.add_step_btn)
         btn_row.addWidget(self.remove_step_btn)
+        btn_row.addWidget(self.import_steps_btn)
         btn_row.addStretch()
         btn_row.addWidget(self.step_up_btn)
         btn_row.addWidget(self.step_down_btn)
@@ -234,8 +322,7 @@ class RecipeForm(QWidget):
         self.steps_table = QTableWidget(0, len(STEP_COLUMNS))
         self.steps_table.setHorizontalHeaderLabels(STEP_COLUMNS)
         header = self.steps_table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.steps_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectItems
         )
@@ -256,15 +343,13 @@ class RecipeForm(QWidget):
         # Connect buttons
         self.add_step_btn.clicked.connect(self._add_step_row)
         self.remove_step_btn.clicked.connect(self._remove_step_row)
+        self.import_steps_btn.clicked.connect(self._import_steps_from_file)
         self.step_up_btn.clicked.connect(lambda: self._move_row(self.steps_table, -1))
         self.step_down_btn.clicked.connect(lambda: self._move_row(self.steps_table, 1))
-
-        self._layout.addWidget(group)
 
     def _add_step_row(self):
         row = self.steps_table.rowCount()
         self.steps_table.insertRow(row)
-        self._renumber_steps()
 
     def _remove_step_row(self):
         rows = sorted(
@@ -273,27 +358,19 @@ class RecipeForm(QWidget):
         )
         for r in rows:
             self.steps_table.removeRow(r)
-        self._renumber_steps()
-
-    def _renumber_steps(self):
-        for row in range(self.steps_table.rowCount()):
-            item = self.steps_table.item(row, 0)
-            if item is None:
-                item = QTableWidgetItem()
-                item.setFlags(Qt.ItemFlag.ItemIsEnabled)  # non-editable
-                self.steps_table.setItem(row, 0, item)
-            item.setText(str(row + 1))
 
     # --- Tips -------------------------------------------------------------
 
     def _add_tips_section(self):
-        group = QGroupBox("小贴士")
-        vbox = QVBoxLayout(group)
+        self._tips_group = QGroupBox("小贴士")
+        vbox = QVBoxLayout(self._tips_group)
 
         # Buttons row
         btn_row = QHBoxLayout()
         self.add_tip_btn = QPushButton("添加")
         self.remove_tip_btn = QPushButton("删除选中")
+        self.import_tips_btn = QPushButton("快速导入")
+        self.import_tips_btn.setToolTip("从 MD 文件导入小贴士（每行一条，覆盖已有数据）")
         self.tip_up_btn = QPushButton("▲")
         self.tip_up_btn.setFixedWidth(30)
         self.tip_up_btn.setToolTip("上移")
@@ -302,6 +379,7 @@ class RecipeForm(QWidget):
         self.tip_down_btn.setToolTip("下移")
         btn_row.addWidget(self.add_tip_btn)
         btn_row.addWidget(self.remove_tip_btn)
+        btn_row.addWidget(self.import_tips_btn)
         btn_row.addStretch()
         btn_row.addWidget(self.tip_up_btn)
         btn_row.addWidget(self.tip_down_btn)
@@ -311,8 +389,7 @@ class RecipeForm(QWidget):
         self.tips_table = QTableWidget(0, len(TIP_COLUMNS))
         self.tips_table.setHorizontalHeaderLabels(TIP_COLUMNS)
         header = self.tips_table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.tips_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         self.tips_table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
         self.tips_table.setEditTriggers(
@@ -329,15 +406,13 @@ class RecipeForm(QWidget):
         # Connect buttons
         self.add_tip_btn.clicked.connect(self._add_tip_row)
         self.remove_tip_btn.clicked.connect(self._remove_tip_row)
+        self.import_tips_btn.clicked.connect(self._import_tips_from_file)
         self.tip_up_btn.clicked.connect(lambda: self._move_row(self.tips_table, -1))
         self.tip_down_btn.clicked.connect(lambda: self._move_row(self.tips_table, 1))
-
-        self._layout.addWidget(group)
 
     def _add_tip_row(self):
         row = self.tips_table.rowCount()
         self.tips_table.insertRow(row)
-        self._renumber_tips()
 
     def _remove_tip_row(self):
         rows = sorted(
@@ -346,21 +421,92 @@ class RecipeForm(QWidget):
         )
         for r in rows:
             self.tips_table.removeRow(r)
-        self._renumber_tips()
 
-    def _renumber_tips(self):
-        for row in range(self.tips_table.rowCount()):
-            item = self.tips_table.item(row, 0)
-            if item is None:
-                item = QTableWidgetItem()
-                item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-                self.tips_table.setItem(row, 0, item)
-            item.setText(str(row + 1))
+    # --- Quick Import from file ---------------------------------------------
+
+    @staticmethod
+    def _strip_list_marker(line: str) -> str:
+        """Remove ordered (1. 1、 1) 1.) and unordered (- * •) list markers."""
+        import re
+        return re.sub(r"^(?:\d+[.、．)\s]\s*|[-*•]\s*)", "", line).strip()
+
+    @staticmethod
+    def _get_section(content: str, header: str) -> str:
+        """Extract content under a ## header from markdown."""
+        import re
+        sections = re.split(r"^##\s+", content, flags=re.MULTILINE)
+        for sec in sections:
+            if sec.strip().startswith(header):
+                body = sec[len(header):].strip()
+                next_h2 = re.search(r"^##\s+", body, re.MULTILINE)
+                if next_h2:
+                    body = body[: next_h2.start()]
+                return body
+        return ""
+
+    TIP_FILTER_PATTERNS = [
+        "如果您遵循本指南",  # HowToCook boilerplate about issues/PRs
+    ]
+
+    def _import_steps_from_file(self):
+        """Import steps from '操作' section of current source MD. Overwrites existing data."""
+        if not self._source_path or not self._fm:
+            QMessageBox.warning(self, "快速导入", "请先选择一个源 MD 文件。")
+            return
+        try:
+            content = self._fm.load_markdown(self._source_path)
+            section = self._get_section(content, "操作")
+            if not section:
+                QMessageBox.information(self, "导入步骤", "未找到「操作」部分。")
+                return
+            lines = [self._strip_list_marker(line) for line in section.splitlines()]
+            lines = [line for line in lines if line]
+            if not lines:
+                QMessageBox.information(self, "导入步骤", "未找到有效步骤。")
+                return
+            self.steps_table.setRowCount(0)
+            for line in lines:
+                self._add_step_row()
+                row = self.steps_table.rowCount() - 1
+                self.steps_table.setItem(row, 0, QTableWidgetItem(line))
+            self._dirty = True
+        except Exception as e:
+            QMessageBox.critical(self, "导入失败", f"无法读取文件: {e}")
+
+    def _import_tips_from_file(self):
+        """Import tips from '附加内容' section of current source MD. Overwrites existing data."""
+        if not self._source_path or not self._fm:
+            QMessageBox.warning(self, "快速导入", "请先选择一个源 MD 文件。")
+            return
+        try:
+            content = self._fm.load_markdown(self._source_path)
+            section = self._get_section(content, "附加内容")
+            if not section:
+                QMessageBox.information(self, "导入小贴士", "未找到「附加内容」部分。")
+                return
+            lines = [self._strip_list_marker(line) for line in section.splitlines()]
+            lines = [
+                line for line in lines
+                if line and not any(p in line for p in self.TIP_FILTER_PATTERNS)
+            ]
+            if not lines:
+                QMessageBox.information(self, "导入小贴士", "未找到有效小贴士。")
+                return
+            self.tips_table.setRowCount(0)
+            for line in lines:
+                self._add_tip_row()
+                row = self.tips_table.rowCount() - 1
+                self.tips_table.setItem(row, 0, QTableWidgetItem(line))
+            self._dirty = True
+        except Exception as e:
+            QMessageBox.critical(self, "导入失败", f"无法读取文件: {e}")
 
     # --- Bottom buttons ---------------------------------------------------
 
     def _add_bottom_buttons(self):
-        row = QHBoxLayout()
+        self._buttons_widget = QWidget()
+        row = QHBoxLayout(self._buttons_widget)
+        row.setContentsMargins(0, 0, 0, 0)
         self.save_btn = QPushButton("保存")
         self.clear_btn = QPushButton("清空")
         row.addWidget(self.save_btn)
@@ -369,8 +515,6 @@ class RecipeForm(QWidget):
 
         self.save_btn.clicked.connect(self._on_save_clicked)
         self.clear_btn.clicked.connect(self.clear_form)
-
-        self._layout.addLayout(row)
 
     # ------------------------------------------------------------------
     # Dirty tracking & signal wiring
@@ -384,7 +528,7 @@ class RecipeForm(QWidget):
         self.category_combo.editTextChanged.connect(self._mark_dirty)
         self.category_combo.currentIndexChanged.connect(self._mark_dirty)
         self.servings_spin.valueChanged.connect(self._mark_dirty)
-        self.original_servings_spin.valueChanged.connect(self._mark_dirty)
+        self.images_table.cellChanged.connect(self._mark_dirty)
         self.ingredients_table.cellChanged.connect(self._on_ingredient_cell_changed)
         self.steps_table.cellChanged.connect(self._on_step_cell_changed)
         self.tips_table.cellChanged.connect(self._on_tip_cell_changed)
@@ -434,15 +578,11 @@ class RecipeForm(QWidget):
 
     def _on_step_cell_changed(self, row: int, col: int):
         self._dirty = True
-        # Skip col 0 (non-editable number)
-        if col != 0:
-            self._clean_cell(self.steps_table, row, col)
+        self._clean_cell(self.steps_table, row, col)
 
     def _on_tip_cell_changed(self, row: int, col: int):
         self._dirty = True
-        # Skip col 0 (non-editable number)
-        if col != 0:
-            self._clean_cell(self.tips_table, row, col)
+        self._clean_cell(self.tips_table, row, col)
 
     def _mark_dirty(self, *_):
         self._dirty = True
@@ -455,16 +595,81 @@ class RecipeForm(QWidget):
         target = row + direction
         if target < 0 or target >= table.rowCount():
             return
-        # Swap all cell contents
-        for col in range(table.columnCount()):
-            src_item = table.takeItem(row, col)
-            dst_item = table.takeItem(target, col)
-            table.setItem(row, col, dst_item)
-            table.setItem(target, col, src_item)
+
+        table.blockSignals(True)
+
+        # Collect data from both rows
+        def collect_row(r):
+            items = {}
+            combos = {}
+            for col in range(table.columnCount()):
+                item = table.item(r, col)
+                if item is not None:
+                    items[col] = (item.text(), item.foreground(), item.flags(), item.data(Qt.ItemDataRole.UserRole))
+                w = table.cellWidget(r, col)
+                if w is not None and isinstance(w, QComboBox):
+                    combos[col] = (
+                        w.isEditable(),
+                        w.isEnabled(),
+                        w.styleSheet(),
+                        [w.itemText(i) for i in range(w.count())],
+                        w.currentIndex(),
+                        w.currentText(),
+                    )
+            return items, combos
+
+        src_data = collect_row(row)
+        dst_data = collect_row(target)
+
+        # Write swapped data
+        def write_row(r, items, combos):
+            table.setRowCount(max(table.rowCount(), r + 1))
+            for col in range(table.columnCount()):
+                # Clear existing
+                table.setItem(r, col, None)
+                table.removeCellWidget(r, col)
+                if col in items:
+                    text, fg, flags, user_data = items[col]
+                    new_item = QTableWidgetItem(text)
+                    new_item.setForeground(fg)
+                    new_item.setFlags(flags)
+                    if user_data is not None:
+                        new_item.setData(Qt.ItemDataRole.UserRole, user_data)
+                    table.setItem(r, col, new_item)
+                if col in combos:
+                    editable, enabled, stylesheet, options, cur_idx, cur_text = combos[col]
+                    combo = QComboBox()
+                    combo.setEditable(editable)
+                    combo.addItems(options)
+                    # Reconnect signals based on column type
+                    if col == 6:
+                        combo.currentIndexChanged.connect(
+                            lambda c=combo: self._on_qty_desc_changed(c)
+                        )
+                    else:
+                        combo.currentIndexChanged.connect(self._mark_dirty)
+                        combo.editTextChanged.connect(self._mark_dirty)
+                    # Restore selection by text (more reliable than index)
+                    idx = combo.findText(cur_text)
+                    if idx >= 0:
+                        combo.setCurrentIndex(idx)
+                    else:
+                        combo.setEditText(cur_text)
+                    combo.setEnabled(enabled)
+                    combo.setStyleSheet(stylesheet)
+                    table.setCellWidget(r, col, combo)
+
+        write_row(row, dst_data[0], dst_data[1])
+        write_row(target, src_data[0], src_data[1])
+
+        # Re-initialize link status and approximate state after writing
+        if table is self.ingredients_table:
+            for r in (row, target):
+                self._update_link_status(r)
+                self._update_approx_state(r)
+
+        table.blockSignals(False)
         table.selectRow(target)
-        # Steps need renumbering after reorder
-        if table is self.steps_table:
-            self._renumber_steps()
         self._dirty = True
 
     def is_dirty(self) -> bool:
@@ -509,7 +714,10 @@ class RecipeForm(QWidget):
             self.category_combo.setEditText(category)
 
         self.servings_spin.setValue(data.get("servings", 1))
-        self.original_servings_spin.setValue(data.get("original_servings", 1))
+
+        # Images
+        for url in data.get("images", []):
+            self._add_image_row(url)
 
         # Ingredients
         for ing in data.get("ingredients", []):
@@ -518,15 +726,14 @@ class RecipeForm(QWidget):
         # Steps
         for step in data.get("steps", []):
             self._add_step_row_from(step)
-        self._renumber_steps()
 
         # Tips
         tips = data.get("tips", [])
         for tip in tips:
             self._add_tip_row_from(tip)
-        self._renumber_tips()
 
         self._dirty = False  # reset after all fields are populated
+        self._resize_columns_to_content()
 
     def collect_data(self) -> dict:
         """Gather all form fields into a dict matching the Recipe JSON structure."""
@@ -542,7 +749,7 @@ class RecipeForm(QWidget):
 
         tips = []
         for row in range(self.tips_table.rowCount()):
-            item = self.tips_table.item(row, 1)
+            item = self.tips_table.item(row, 0)
             text = item.text().strip() if item else ""
             if text:
                 tips.append(text)
@@ -557,8 +764,7 @@ class RecipeForm(QWidget):
             ),
             "total_time_minutes": None,
             "servings": self.servings_spin.value(),
-            "original_servings": self.original_servings_spin.value(),
-            "images": [],
+            "images": self._collect_images(),
             "ingredients": ingredients,
             "steps": steps,
             "tips": tips,
@@ -570,11 +776,54 @@ class RecipeForm(QWidget):
         self.difficulty_combo.setCurrentIndex(0)
         self.category_combo.setCurrentIndex(0)
         self.servings_spin.setValue(1)
-        self.original_servings_spin.setValue(1)
+        self.images_table.setRowCount(0)
         self.ingredients_table.setRowCount(0)
         self.steps_table.setRowCount(0)
         self.tips_table.setRowCount(0)
         self._dirty = False
+
+    def _resize_columns_to_content(self):
+        """Set column widths based on content, then switch to interactive for manual drag."""
+        self._fit_table(self.ingredients_table, {
+            1: 40,  # 关联 - narrow
+            7: 60,  # 是否可选 - narrow
+            8: 150, # 备注 - wider default
+        }, stretch_cols=[0, 2, 3, 4, 5, 6, 8])
+
+        self._fit_table(self.steps_table, {
+            1: 80,  # 用时 - narrow
+        }, stretch_cols=[0, 2])
+
+        self._fit_table(self.tips_table, {}, stretch_cols=[0])
+        self._fit_table(self.images_table, {}, stretch_cols=[0])
+
+    def _fit_table(self, table, narrow_widths, stretch_cols):
+        """Auto-size columns, then switch all to Interactive for manual drag."""
+        from PySide6.QtWidgets import QApplication
+        header = table.horizontalHeader()
+
+        # Narrow columns get fixed widths
+        for col, w in narrow_widths.items():
+            header.resizeSection(col, w)
+
+        # Stretch columns auto-size to content
+        for col in stretch_cols:
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+
+        # Let Qt process layout
+        QApplication.processEvents()
+
+        # For single-stretch tables, make the one column fill remaining width
+        if len(stretch_cols) == 1:
+            c = stretch_cols[0]
+            used = sum(header.sectionSize(i) for i in range(table.columnCount()) if i != c)
+            avail = table.viewport().width() - used
+            if avail > header.sectionSize(c):
+                header.resizeSection(c, avail)
+
+        # Switch all to interactive for manual dragging
+        for col in range(table.columnCount()):
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
 
     def set_ingredient_manager(self, mgr):
         """Set the ingredient manager for auto-completion and linking."""
@@ -585,6 +834,11 @@ class RecipeForm(QWidget):
         """Set the unit manager for unit dropdown population."""
         self._um = mgr
         self._refresh_unit_combos()
+
+    def set_file_source(self, source_path: str, fm):
+        """Set the current source MD path and file manager for quick import."""
+        self._source_path = source_path
+        self._fm = fm
 
     def _create_unit_combo(self, selected: str = "") -> QComboBox:
         """Create a QComboBox for the unit column."""
@@ -667,25 +921,84 @@ class RecipeForm(QWidget):
         self._completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self._completer.setFilterMode(Qt.MatchFlag.MatchContains)
 
+    def _get_approx_key(self, row: int) -> str:
+        """Get a stable storage key for a row's approx values."""
+        # Use a persistent ID stored as property on the row's name item
+        name_item = self.ingredients_table.item(row, 0)
+        if name_item is None:
+            return f"row_{row}"
+        uid = name_item.data(Qt.ItemDataRole.UserRole)
+        if uid is None:
+            uid = f"row_{id(name_item)}"
+            name_item.setData(Qt.ItemDataRole.UserRole, uid)
+        return uid
+
     def _update_approx_state(self, row: int):
-        """When '用量描述' is set, clear and gray out quantity/range cells."""
+        """When '用量描述' is set, hide quantity/range/unit cells and save their values."""
         combo = self.ingredients_table.cellWidget(row, 6)
         is_approx = isinstance(combo, QComboBox) and combo.currentText() != ""
         gray = Qt.GlobalColor.gray
         black = Qt.GlobalColor.black
+        key = self._get_approx_key(row)
+
+        if is_approx:
+            # Save current values before hiding
+            if key not in self._approx_values:
+                saved = {}
+                for col in (2, 4, 5):
+                    item = self.ingredients_table.item(row, col)
+                    saved[col] = item.text() if item else ""
+                    self.ingredients_table.blockSignals(True)
+                    item.setText("")
+                    self.ingredients_table.blockSignals(False)
+                unit_combo = self.ingredients_table.cellWidget(row, 3)
+                saved[3] = unit_combo.currentText() if isinstance(unit_combo, QComboBox) else ""
+                self._approx_values[key] = saved
+        else:
+            # Restore saved values
+            saved = self._approx_values.pop(key, None)
+            if saved:
+                for col in (2, 4, 5):
+                    item = self.ingredients_table.item(row, col)
+                    if item and saved.get(col):
+                        self.ingredients_table.blockSignals(True)
+                        item.setText(saved[col])
+                        self.ingredients_table.blockSignals(False)
+                if saved.get(3):
+                    unit_combo = self.ingredients_table.cellWidget(row, 3)
+                    if isinstance(unit_combo, QComboBox):
+                        self.ingredients_table.blockSignals(True)
+                        idx = unit_combo.findText(saved[3])
+                        if idx >= 0:
+                            unit_combo.setCurrentIndex(idx)
+                        else:
+                            unit_combo.setEditText(saved[3])
+                        self.ingredients_table.blockSignals(False)
+
+        # Update visual state (always, regardless of save/restore)
         for col in (2, 4, 5):
             item = self.ingredients_table.item(row, col)
             if item is None:
                 continue
+            self.ingredients_table.blockSignals(True)
             if is_approx:
-                self.ingredients_table.blockSignals(True)
-                item.setText("")
                 item.setForeground(gray)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                self.ingredients_table.blockSignals(False)
             else:
                 item.setForeground(black)
                 item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+            self.ingredients_table.blockSignals(False)
+
+        unit_combo = self.ingredients_table.cellWidget(row, 3)
+        if isinstance(unit_combo, QComboBox):
+            self.ingredients_table.blockSignals(True)
+            if is_approx:
+                unit_combo.setEnabled(False)
+                unit_combo.setStyleSheet("color: gray;")
+            else:
+                unit_combo.setEnabled(True)
+                unit_combo.setStyleSheet("")
+            self.ingredients_table.blockSignals(False)
 
     def _update_link_status(self, row: int):
         """Update the link status icon for an ingredient row."""
@@ -748,10 +1061,10 @@ class RecipeForm(QWidget):
 
         # "用量描述" combo (col 6)
         qty_desc = ""
-        if ing.get("is_approximate"):
-            qty_desc = qty_text if qty_text in ("适量", "少许") else "适量"
-        elif qty_text in ("适量", "少许"):
-            qty_desc = qty_text
+        if ing.get("quantity_description"):
+            qty_desc = ing["quantity_description"]
+        elif ing.get("is_approximate"):
+            qty_desc = "适量"
         self.ingredients_table.setCellWidget(
             row, 6, self._create_qty_desc_combo(qty_desc)
         )
@@ -770,35 +1083,29 @@ class RecipeForm(QWidget):
             row, 8, QTableWidgetItem(ing.get("note", ""))
         )
 
+        # Apply approximate state if needed
+        self._update_approx_state(row)
+
     def _add_step_row_from(self, step: dict) -> None:
         row = self.steps_table.rowCount()
         self.steps_table.insertRow(row)
 
-        # 序号 (auto-generated, non-editable)
-        num_item = QTableWidgetItem(str(step.get("step", row + 1)))
-        num_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-        self.steps_table.setItem(row, 0, num_item)
-
         # 描述
-        self.steps_table.setItem(
-            row, 1, QTableWidgetItem(step.get("content", ""))
-        )
+        self.steps_table.setItem(row, 0, QTableWidgetItem(step.get("content", "")))
 
         # 用时(分钟)
         duration = step.get("duration_minutes")
         dur_text = str(duration) if duration is not None else ""
-        self.steps_table.setItem(row, 2, QTableWidgetItem(dur_text))
+        self.steps_table.setItem(row, 1, QTableWidgetItem(dur_text))
 
         # 备注
-        self.steps_table.setItem(
-            row, 3, QTableWidgetItem(step.get("tips", ""))
-        )
+        self.steps_table.setItem(row, 2, QTableWidgetItem(step.get("tips", "")))
 
     def _add_tip_row_from(self, tip) -> None:
         row = self.tips_table.rowCount()
         self.tips_table.insertRow(row)
         text = tip if isinstance(tip, str) else str(tip)
-        self.tips_table.setItem(row, 1, QTableWidgetItem(text))
+        self.tips_table.setItem(row, 0, QTableWidgetItem(text))
 
     def _collect_ingredient_row(self, row: int) -> dict:
         def _text(col: int) -> str:
@@ -865,7 +1172,7 @@ class RecipeForm(QWidget):
             return item.text().strip() if item else ""
 
         duration = None
-        dur_str = _text(2)
+        dur_str = _text(1)
         if dur_str:
             try:
                 duration = float(dur_str)
@@ -873,8 +1180,7 @@ class RecipeForm(QWidget):
                 duration = None
 
         return {
-            "step": row + 1,
-            "content": _text(1),
+            "content": _text(0),
             "duration_minutes": duration,
-            "tips": _text(3),
+            "tips": _text(2),
         }

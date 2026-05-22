@@ -1,12 +1,12 @@
 # src/ui/recipe_tab.py
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QWidget,
-    QHBoxLayout,
     QVBoxLayout,
     QPushButton,
+    QSplitter,
     QTabWidget,
     QToolBar,
     QMessageBox,
@@ -34,10 +34,8 @@ class RecipeTab(QWidget):
         self._toolbar.addWidget(self._batch_btn)
         outer_layout.addWidget(self._toolbar)
 
-        # --- main horizontal layout ---
-        main_widget = QWidget()
-        layout = QHBoxLayout(main_widget)
-        layout.setContentsMargins(0, 0, 0, 0)
+        # --- main horizontal splitter: left / middle / right ---
+        self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # 左栏 - 数据源（目录树 + Markdown 预览）
         self.source_panel = SourcePanel()
@@ -53,11 +51,14 @@ class RecipeTab(QWidget):
         self.right_tabs.addTab(self.ingredient_panel, "食材库")
         self.right_tabs.addTab(self.unit_panel, "单位库")
 
-        layout.addWidget(self.source_panel, 1)
-        layout.addWidget(self.recipe_form, 2)
-        layout.addWidget(self.right_tabs, 1)
+        self._main_splitter.addWidget(self.source_panel)
+        self._main_splitter.addWidget(self.recipe_form)
+        self._main_splitter.addWidget(self.right_tabs)
+        self._main_splitter.setStretchFactor(0, 1)
+        self._main_splitter.setStretchFactor(1, 4)
+        self._main_splitter.setStretchFactor(2, 1)
 
-        outer_layout.addWidget(main_widget)
+        outer_layout.addWidget(self._main_splitter)
 
         # Internal state
         self._im = None  # IngredientManager
@@ -78,6 +79,17 @@ class RecipeTab(QWidget):
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not hasattr(self, '_sizes_done'):
+            QTimer.singleShot(100, self._apply_sizes)
+
+    def _apply_sizes(self):
+        w = self._main_splitter.width()
+        if w > 0:
+            self._main_splitter.setSizes([w // 6, 4 * w // 6, w // 6])
+        self._sizes_done = True
 
     def set_file_manager(self, fm):
         """Propagate the FileManager to the source panel."""
@@ -121,15 +133,17 @@ class RecipeTab(QWidget):
             return
 
         self._current_source_path = rel_path
+        fm = self.source_panel._fm
+        if fm is None:
+            return
+
+        self.recipe_form.set_file_source(rel_path, fm)
 
         # Use cached result if available from batch import
         if rel_path in self._parsed_results:
             self.recipe_form.load_recipe(self._parsed_results[rel_path])
             return
 
-        fm = self.source_panel._fm
-        if fm is None:
-            return
         try:
             content = fm.load_markdown(rel_path)
             parsed = MarkdownParser.parse(content, source_path=rel_path)
@@ -199,6 +213,10 @@ class RecipeTab(QWidget):
                         except Exception:
                             pass
                         break
+
+            # Pass source path to form for quick import
+            if self._current_source_path:
+                self.recipe_form.set_file_source(self._current_source_path, fm)
         except Exception as e:
             print(f"[RecipeTab] Error loading output recipe: {e}")
 
@@ -218,11 +236,10 @@ class RecipeTab(QWidget):
 
         recipe_name = data.get("name", "未命名")
 
-        # Determine output relative path
+        # Determine output relative path — always flat under out/
         source_path = data.get("source_file") or self._current_source_path or ""
         if source_path:
-            # Replace .md extension with .json, keep directory structure
-            output_rel = source_path.rsplit(".", 1)[0] + ".json"
+            output_rel = Path(source_path).stem + ".json"
         else:
             # Fallback: put in root with recipe name
             output_rel = f"{recipe_name}.json"

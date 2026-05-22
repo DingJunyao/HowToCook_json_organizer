@@ -125,7 +125,22 @@ class SourcePanel(QWidget):
         self._render_markdown(text)
 
     def _render_markdown(self, text: str):
-        """Internal: convert markdown to HTML and display."""
+        """Internal: convert markdown to HTML and display, with image placeholders."""
+        # Replace image syntax ![alt](url) with a visible placeholder
+        import re
+        def image_placeholder(m):
+            alt = m.group(1)
+            url = m.group(2)
+            return (
+                f'<div style="background:#fff3cd;border:1px solid #ffc107;'
+                f'border-radius:4px;padding:6px 10px;margin:4px 0;'
+                f'font-size:12px;color:#856404;">'
+                f'<b>[图片]</b> {alt}<br>'
+                f'<span style="word-break:break-all;color:#666;font-family:monospace;">{url}</span>'
+                f'</div>'
+            )
+        text = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', image_placeholder, text)
+
         html = markdown.markdown(text, extensions=["tables", "fenced_code"])
         styled = f"""
         <html><head><style>

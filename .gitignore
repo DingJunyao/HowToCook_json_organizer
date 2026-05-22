@@ -20,3 +20,4 @@ Thumbs.db
 
 # Data files (large JSON datasets should not be committed)
 data/*.json
+.claude

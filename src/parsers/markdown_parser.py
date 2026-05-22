@@ -21,11 +21,24 @@ DIFFICULTY_MAP = {1: "simple", 2: "easy", 3: "medium", 4: "hard", 5: "expert"}
 
 class MarkdownParser:
     @staticmethod
+    def _parse_servings(content: str) -> int:
+        """Try to extract servings from patterns like （一人份）（二人份）."""
+        m = re.search(r"（([一二三四五六七八九十]+)人份）", content)
+        if m:
+            chinese_to_int = {
+                "一": 1, "二": 2, "三": 3, "四": 4, "五": 5,
+                "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
+            }
+            return chinese_to_int.get(m.group(1), 1)
+        return 1
+
+    @staticmethod
     def parse(content: str, source_path: str = "") -> dict:
         lines = content.split("\n")
         name = MarkdownParser._parse_name(lines)
         difficulty = MarkdownParser._parse_difficulty(lines)
         category = MarkdownParser._parse_category(source_path)
+        servings = MarkdownParser._parse_servings(content)
         ingredients = MarkdownParser._parse_ingredients(content)
         steps = MarkdownParser._parse_steps(content)
         tips = MarkdownParser._parse_tips(content)
@@ -36,8 +49,7 @@ class MarkdownParser:
             "category": category,
             "difficulty": difficulty,
             "total_time_minutes": None,
-            "servings": 1,
-            "original_servings": 1,
+            "servings": servings,
             "images": [],
             "ingredients": ingredients,
             "steps": steps,

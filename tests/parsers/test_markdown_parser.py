@@ -61,3 +61,8 @@ def test_parse_steps():
 def test_parse_tips():
     result = MarkdownParser.parse(SAMPLE_MD, "dishes/meat_dish/可乐鸡翅.md")
     assert len(result["tips"]) >= 1
+
+def test_parse_servings():
+    # 一人份 in the 计算 section
+    result = MarkdownParser.parse(SAMPLE_MD, "dishes/meat_dish/可乐鸡翅.md")
+    assert result["servings"] == 1

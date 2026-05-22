@@ -60,7 +60,6 @@ class Recipe:
     difficulty: str = ""
     total_time_minutes: Optional[float] = None
     servings: int = 1
-    original_servings: int = 1
     images: list[str] = field(default_factory=list)
     ingredients: list[IngredientEntry] = field(default_factory=list)
     steps: list[StepEntry] = field(default_factory=list)
@@ -77,7 +76,6 @@ class Recipe:
             difficulty=data.get("difficulty", ""),
             total_time_minutes=data.get("total_time_minutes"),
             servings=data.get("servings", 1),
-            original_servings=data.get("original_servings", 1),
             images=data.get("images", []),
             ingredients=ingredients,
             steps=steps,
@@ -92,7 +90,6 @@ class Recipe:
             "difficulty": self.difficulty,
             "total_time_minutes": self.total_time_minutes,
             "servings": self.servings,
-            "original_servings": self.original_servings,
             "images": self.images,
             "ingredients": [i.to_dict() for i in self.ingredients],
             "steps": [s.to_dict() for s in self.steps],

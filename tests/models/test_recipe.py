@@ -9,7 +9,6 @@ def test_recipe_from_dict():
         "difficulty": "easy",
         "total_time_minutes": 15,
         "servings": 1,
-        "original_servings": 2,
         "images": [],
         "ingredients": [
             {
@@ -44,7 +43,6 @@ def test_recipe_to_dict():
         difficulty="easy",
         total_time_minutes=15,
         servings=1,
-        original_servings=2,
         images=[],
         ingredients=[
             IngredientEntry(ingredient_name="番茄", quantity=2.0, unit="个")

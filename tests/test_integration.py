@@ -274,7 +274,6 @@ def test_recipe_model_roundtrip():
         "difficulty": "medium",
         "total_time_minutes": None,
         "servings": 1,
-        "original_servings": 1,
         "images": [],
         "ingredients": [
             {

@@ -13,9 +13,29 @@ class FileManager:
     def save_recipe(self, relative_path: str, data: dict) -> None:
         path = self.output_dir / "out" / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
+        # If the file already exists, merge to preserve field order
+        if path.exists():
+            try:
+                existing = json.loads(path.read_text(encoding="utf-8"))
+                merged = self._merge_preserve_order(existing, data)
+                data = merged
+            except Exception:
+                pass  # fall through to plain save
         path.write_text(
             json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+
+    @staticmethod
+    def _merge_preserve_order(existing: dict, new: dict) -> dict:
+        """Update `existing` in-place with values from `new`, preserving key order."""
+        for key in existing:
+            if key in new:
+                existing[key] = new[key]
+        # Add any new keys that weren't in existing (at the end)
+        for key in new:
+            if key not in existing:
+                existing[key] = new[key]
+        return existing
 
     def load_recipe(self, relative_path: str) -> dict:
         path = self.output_dir / "out" / relative_path
