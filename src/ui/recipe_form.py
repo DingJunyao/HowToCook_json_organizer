@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QCompleter,
     QMessageBox,
+    QTextEdit,
 )
 
 # ---------------------------------------------------------------------------
@@ -87,23 +88,25 @@ class RecipeForm(QWidget):
         self._add_steps_section()
         self._add_tips_section()
         self._add_images_section()
+        self._add_description_section()
         self._add_bottom_buttons()
 
         # --- layout ---
         # Top: basic info (fixed height)
         outer.addWidget(self._basic_group)
 
-        # Middle: vertical splitter for Ingredients : Steps : [Tips+Images]
+        # Middle: vertical splitter for Ingredients : Steps : [Tips+Images+Description]
         main_splitter = QSplitter(Qt.Orientation.Vertical)
         main_splitter.setChildrenCollapsible(False)
         main_splitter.addWidget(self._ingredients_group)
         main_splitter.addWidget(self._steps_group)
 
-        # Bottom row: tips + images side by side
+        # Bottom row: tips + images + description side by side
         bottom_row = QSplitter(Qt.Orientation.Horizontal)
         bottom_row.setChildrenCollapsible(False)
         bottom_row.addWidget(self._tips_group)
         bottom_row.addWidget(self._images_group)
+        bottom_row.addWidget(self._description_group)
 
         main_splitter.addWidget(bottom_row)
 
@@ -189,6 +192,26 @@ class RecipeForm(QWidget):
 
         self.add_image_btn.clicked.connect(self._add_image_row)
         self.remove_image_btn.clicked.connect(self._remove_image_row)
+
+    # --- Description ---------------------------------------------------------
+
+    def _add_description_section(self):
+        self._description_group = QGroupBox("简介")
+        vbox = QVBoxLayout(self._description_group)
+
+        btn_row = QHBoxLayout()
+        self.import_description_btn = QPushButton("快速导入")
+        self.import_description_btn.setToolTip("从 MD 文件中导入简介（H1 标题下的纯文本，自动排除难度和卡路里信息）")
+        btn_row.addWidget(self.import_description_btn)
+        btn_row.addStretch()
+        vbox.addLayout(btn_row)
+
+        self.description_edit = QTextEdit()
+        self.description_edit.setPlaceholderText("菜谱介绍...")
+        self.description_edit.setMinimumHeight(60)
+        vbox.addWidget(self.description_edit)
+
+        self.import_description_btn.clicked.connect(self._import_description_from_file)
 
     def _add_image_row(self, url: str = ""):
         row = self.images_table.rowCount()
@@ -501,6 +524,44 @@ class RecipeForm(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "导入失败", f"无法读取文件: {e}")
 
+    DESCRIPTION_FILTER_PATTERNS = [
+        "预估烹饪难度",
+        "预估卡路里",
+    ]
+
+    def _import_description_from_file(self):
+        """Import description from plain text directly under the h1 heading."""
+        if not self._source_path or not self._fm:
+            QMessageBox.warning(self, "快速导入", "请先选择一个源 MD 文件。")
+            return
+        try:
+            content = self._fm.load_markdown(self._source_path)
+            lines = content.splitlines()
+            description_lines = []
+            found_h1 = False
+            for line in lines:
+                if line.startswith("# "):
+                    found_h1 = True
+                    continue
+                if found_h1:
+                    if line.startswith("#"):
+                        break
+                    stripped = line.strip()
+                    if stripped and stripped.startswith("!"):
+                        continue  # skip image markdown lines
+                    if stripped and not any(p in stripped for p in self.DESCRIPTION_FILTER_PATTERNS):
+                        description_lines.append(stripped)
+                    elif not stripped and description_lines:
+                        description_lines.append("")
+            text = "\n".join(description_lines).strip()
+            if not text:
+                QMessageBox.information(self, "导入简介", "未找到有效简介内容。")
+                return
+            self.description_edit.setPlainText(text)
+            self._dirty = True
+        except Exception as e:
+            QMessageBox.critical(self, "导入失败", f"无法读取文件: {e}")
+
     # --- Bottom buttons ---------------------------------------------------
 
     def _add_bottom_buttons(self):
@@ -532,6 +593,8 @@ class RecipeForm(QWidget):
         self.ingredients_table.cellChanged.connect(self._on_ingredient_cell_changed)
         self.steps_table.cellChanged.connect(self._on_step_cell_changed)
         self.tips_table.cellChanged.connect(self._on_tip_cell_changed)
+
+        self.description_edit.textChanged.connect(self._mark_dirty)
 
         # Clean invisible chars on focus-out for line edits
         self.name_edit.editingFinished.connect(
@@ -716,6 +779,7 @@ class RecipeForm(QWidget):
         self.servings_spin.setValue(data.get("servings", 1))
 
         # Images
+        self.description_edit.setPlainText(data.get("description", ""))
         for url in data.get("images", []):
             self._add_image_row(url)
 
@@ -765,6 +829,7 @@ class RecipeForm(QWidget):
             "total_time_minutes": None,
             "servings": self.servings_spin.value(),
             "images": self._collect_images(),
+            "description": self.description_edit.toPlainText().strip(),
             "ingredients": ingredients,
             "steps": steps,
             "tips": tips,
@@ -777,6 +842,7 @@ class RecipeForm(QWidget):
         self.category_combo.setCurrentIndex(0)
         self.servings_spin.setValue(1)
         self.images_table.setRowCount(0)
+        self.description_edit.clear()
         self.ingredients_table.setRowCount(0)
         self.steps_table.setRowCount(0)
         self.tips_table.setRowCount(0)

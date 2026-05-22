@@ -275,6 +275,7 @@ def test_recipe_model_roundtrip():
         "total_time_minutes": None,
         "servings": 1,
         "images": [],
+        "description": "",
         "ingredients": [
             {
                 "ingredient_name": "可乐",
