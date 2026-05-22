@@ -1,6 +1,8 @@
 # src/ui/recipe_tab.py
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QVBoxLayout
 
+from src.parsers.markdown_parser import MarkdownParser
+from src.ui.recipe_form import RecipeForm
 from src.ui.source_panel import SourcePanel
 
 
@@ -13,10 +15,7 @@ class RecipeTab(QWidget):
         self.source_panel = SourcePanel()
 
         # 中栏 - 编辑区
-        center = QVBoxLayout()
-        center.addWidget(QLabel("编辑区"))
-        center_w = QWidget()
-        center_w.setLayout(center)
+        self.recipe_form = RecipeForm()
 
         # 右栏 - 参考区
         right = QVBoxLayout()
@@ -25,7 +24,7 @@ class RecipeTab(QWidget):
         right_w.setLayout(right)
 
         layout.addWidget(self.source_panel, 1)
-        layout.addWidget(center_w, 1)
+        layout.addWidget(self.recipe_form, 2)
         layout.addWidget(right_w, 1)
 
         # Connect signals
@@ -44,5 +43,13 @@ class RecipeTab(QWidget):
     # ------------------------------------------------------------------
 
     def _on_file_selected(self, rel_path: str):
-        # Placeholder — will be wired to center panel later
-        print(f"[RecipeTab] file selected: {rel_path}")
+        """Load MD -> parse with MarkdownParser -> populate RecipeForm."""
+        fm = self.source_panel._fm
+        if fm is None:
+            return
+        try:
+            content = fm.load_markdown(rel_path)
+            parsed = MarkdownParser.parse(content, source_path=rel_path)
+            self.recipe_form.load_recipe(parsed)
+        except Exception as e:
+            print(f"[RecipeTab] Error loading recipe: {e}")
