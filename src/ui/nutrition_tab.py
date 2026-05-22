@@ -1,8 +1,10 @@
 # src/ui/nutrition_tab.py
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QVBoxLayout
+from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from src.managers.ingredient_manager import IngredientManager
+from src.managers.nutrition_matcher import NutritionMatcher
 from src.ui.nutrition_ingredient_list import NutritionIngredientList
+from src.ui.nutrition_panel import NutritionPanel
 
 
 class NutritionTab(QWidget):
@@ -14,20 +16,18 @@ class NutritionTab(QWidget):
         self._ingredient_list = NutritionIngredientList()
         layout.addWidget(self._ingredient_list, 1)
 
-        # 中栏 - 匹配操作
-        center = QVBoxLayout()
-        center.addWidget(QLabel("匹配操作"))
-        center_w = QWidget()
-        center_w.setLayout(center)
+        # 中栏 + 右栏 - 匹配操作与营养详情
+        self._panel = NutritionPanel()
+        layout.addWidget(self._panel, 2)
 
-        # 右栏 - 营养详情
-        right = QVBoxLayout()
-        right.addWidget(QLabel("营养详情"))
-        right_w = QWidget()
-        right_w.setLayout(right)
-
-        layout.addWidget(center_w, 1)
-        layout.addWidget(right_w, 1)
+        # 信号连接: 左栏选中食材 -> 中栏加载详情
+        self._ingredient_list.ingredient_selected.connect(
+            self._panel.set_ingredient
+        )
 
     def set_ingredient_manager(self, mgr: IngredientManager) -> None:
         self._ingredient_list.set_ingredient_manager(mgr)
+        self._panel.set_ingredient_manager(mgr)
+
+    def set_nutrition_matcher(self, matcher: NutritionMatcher) -> None:
+        self._panel.set_nutrition_matcher(matcher)
