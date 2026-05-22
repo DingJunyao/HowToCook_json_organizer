@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import markdown
 from pathlib import Path
 
 from PySide6.QtCore import Signal, Qt
@@ -69,7 +70,7 @@ class SourcePanel(QWidget):
 
         # --- splitter ---
         splitter = QSplitter()
-        splitter.setOrientation(QSplitter.Orientation.Vertical)
+        splitter.setOrientation(Qt.Orientation.Vertical)
 
         # --- tree ---
         self.tree = QTreeWidget()
@@ -118,6 +119,25 @@ class SourcePanel(QWidget):
         """Set the FileManager and refresh the tree."""
         self._fm = fm
         self.refresh_tree()
+
+    def render_markdown(self, text: str):
+        """Render markdown text as HTML in the preview area."""
+        self._render_markdown(text)
+
+    def _render_markdown(self, text: str):
+        """Internal: convert markdown to HTML and display."""
+        html = markdown.markdown(text, extensions=["tables", "fenced_code"])
+        styled = f"""
+        <html><head><style>
+        body {{ font-family: "Microsoft YaHei", "Segoe UI", sans-serif; font-size: 14px;
+               padding: 8px; line-height: 1.6; }}
+        h1 {{ color: #2c3e50; border-bottom: 1px solid #ddd; padding-bottom: 4px; }}
+        h2 {{ color: #34495e; margin-top: 16px; }}
+        ul {{ padding-left: 20px; }}
+        li {{ margin: 2px 0; }}
+        </style></head><body>{html}</body></html>
+        """
+        self.preview.setHtml(styled)
 
     def refresh_tree(self):
         """Rebuild the directory tree based on current mode."""
@@ -236,29 +256,23 @@ class SourcePanel(QWidget):
         if rel_path is None:
             return  # clicked a category node
 
+        # Load markdown content into preview
+        if self._fm is not None:
+            try:
+                content = self._fm.load_markdown(rel_path)
+                self._render_markdown(content)
+            except Exception:
+                self.preview.setHtml(f"<p>[无法加载文件: {rel_path}]</p>")
+
         # Check if a corresponding JSON already exists in output
         if self._fm is not None:
             file_stem = Path(rel_path).stem
             json_rel = f"{file_stem}.json"
             json_full = self._fm.output_dir / "out" / json_rel
             if json_full.exists():
-                # Load the JSON instead of re-parsing the MD
-                try:
-                    self.preview.setPlainText(
-                        f"[已存在 JSON 输出: {json_rel}]\n\n正在加载 JSON …"
-                    )
-                except Exception:
-                    pass
+                # Emit output signal so the form loads the existing JSON
                 self.output_file_selected.emit(json_rel)
                 return
-
-        # Load markdown content into preview
-        if self._fm is not None:
-            try:
-                content = self._fm.load_markdown(rel_path)
-                self.preview.setPlainText(content)
-            except Exception:
-                self.preview.setPlainText(f"[无法加载文件: {rel_path}]")
 
         self.file_selected.emit(rel_path)
 

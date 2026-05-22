@@ -1,10 +1,13 @@
 # src/ui/recipe_tab.py
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
     QVBoxLayout,
     QPushButton,
+    QTabWidget,
     QToolBar,
     QMessageBox,
 )
@@ -13,6 +16,7 @@ from src.parsers.markdown_parser import MarkdownParser
 from src.ui.ingredient_panel import IngredientPanel
 from src.ui.recipe_form import RecipeForm
 from src.ui.source_panel import SourcePanel
+from src.ui.unit_panel import UnitPanel
 
 
 class RecipeTab(QWidget):
@@ -41,23 +45,32 @@ class RecipeTab(QWidget):
         # 中栏 - 编辑区
         self.recipe_form = RecipeForm()
 
-        # 右栏 - 食材库参考
+        # 右栏 - 食材库 + 单位库（标签页）
         self.ingredient_panel = IngredientPanel()
+        self.unit_panel = UnitPanel()
+
+        self.right_tabs = QTabWidget()
+        self.right_tabs.addTab(self.ingredient_panel, "食材库")
+        self.right_tabs.addTab(self.unit_panel, "单位库")
 
         layout.addWidget(self.source_panel, 1)
         layout.addWidget(self.recipe_form, 2)
-        layout.addWidget(self.ingredient_panel, 1)
+        layout.addWidget(self.right_tabs, 1)
 
         outer_layout.addWidget(main_widget)
 
         # Internal state
         self._im = None  # IngredientManager
+        self._um = None  # UnitManager
         self._current_source_path: str | None = None
 
         # Connect signals
         self.source_panel.file_selected.connect(self._on_file_selected)
         self.source_panel.output_file_selected.connect(self._on_output_file_selected)
         self.recipe_form.save_requested.connect(self._on_save)
+        self.ingredient_panel.ingredient_changed.connect(self._on_ingredients_changed)
+        self.unit_panel.unit_changed.connect(self._on_unit_batch_rename)
+        self.unit_panel.units_updated.connect(self._on_units_updated)
 
         # Parsed results cache: {relative_path: parsed_dict}
         self._parsed_results: dict = {}
@@ -71,9 +84,16 @@ class RecipeTab(QWidget):
         self.source_panel.set_file_manager(fm)
 
     def set_ingredient_manager(self, mgr):
-        """Propagate the IngredientManager to the ingredient panel."""
+        """Propagate the IngredientManager to the ingredient panel and recipe form."""
         self._im = mgr
         self.ingredient_panel.set_ingredient_manager(mgr)
+        self.recipe_form.set_ingredient_manager(mgr)
+
+    def set_unit_manager(self, mgr):
+        """Propagate the UnitManager to the unit panel and recipe form."""
+        self._um = mgr
+        self.unit_panel.set_unit_manager(mgr)
+        self.recipe_form.set_unit_manager(mgr)
 
     # ------------------------------------------------------------------
     # Slots
@@ -136,23 +156,46 @@ class RecipeTab(QWidget):
 
             # Try to load the corresponding source MD for preview
             source_file = data.get("source_file", "")
+
+            # Try multiple strategies to find the source MD
+            md_loaded = False
+
+            # Strategy 1: source_file is a valid relative path
             if source_file:
-                self._current_source_path = source_file
                 try:
                     md_content = fm.load_markdown(source_file)
-                    self.source_panel.preview.setPlainText(md_content)
+                    self._current_source_path = source_file
+                    self.source_panel.render_markdown(md_content)
+                    md_loaded = True
                 except Exception:
-                    pass  # source MD not available, that's okay
-            else:
-                # Fallback: try to find by recipe name matching the JSON stem
-                json_stem = rel_path.rsplit("/", 1)[-1].replace(".json", "")
+                    pass
+
+            # Strategy 2: source_file contains the filename, extract it
+            if not md_loaded and source_file:
+                filename = Path(source_file).name
+                for src in fm.list_source_files():
+                    if src.name == filename:
+                        try:
+                            src_rel = str(src.relative_to(fm.source_dir))
+                            self._current_source_path = src_rel
+                            md_content = fm.load_markdown(src_rel)
+                            self.source_panel.render_markdown(md_content)
+                            md_loaded = True
+                        except Exception:
+                            pass
+                        break
+
+            # Strategy 3: match JSON stem to source file stem
+            if not md_loaded:
+                json_stem = Path(rel_path).stem
                 for src in fm.list_source_files():
                     if src.stem == json_stem:
                         try:
                             src_rel = str(src.relative_to(fm.source_dir))
                             self._current_source_path = src_rel
                             md_content = fm.load_markdown(src_rel)
-                            self.source_panel.preview.setPlainText(md_content)
+                            self.source_panel.render_markdown(md_content)
+                            md_loaded = True
                         except Exception:
                             pass
                         break
@@ -228,6 +271,44 @@ class RecipeTab(QWidget):
         self.recipe_form.set_clean()
 
         print(f"[RecipeTab] 已保存: {recipe_name}")
+
+    def _on_ingredients_changed(self):
+        """Sync ingredient changes: update completer and persist to ingredients.json."""
+        if self._im is not None:
+            self.recipe_form.set_ingredient_manager(self._im)
+
+        fm = self.source_panel._fm
+        if fm is not None and self._im is not None:
+            try:
+                ingredients_data = {}
+                for ing in self._im.get_all():
+                    ingredients_data[ing.key] = ing.to_dict()
+                fm.save_ingredients(ingredients_data)
+            except Exception as e:
+                print(f"[RecipeTab] Warning: could not save ingredients.json: {e}")
+
+    def _on_unit_batch_rename(self, old_name: str, new_name: str):
+        """Apply unit rename to the current recipe form."""
+        self.recipe_form.batch_rename_unit(old_name, new_name)
+
+    def _on_units_updated(self):
+        """Sync unit changes: refresh combo boxes in recipe form."""
+        if self._um is not None:
+            self.recipe_form.set_unit_manager(self._um)
+        # Persist units
+        fm = self.source_panel._fm
+        if fm is not None and self._um is not None:
+            try:
+                import json
+                from pathlib import Path
+                units_path = fm.output_dir / "out" / "units.json"
+                units_path.parent.mkdir(parents=True, exist_ok=True)
+                units_path.write_text(
+                    json.dumps(self._um.to_list(), ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+            except Exception as e:
+                print(f"[RecipeTab] Warning: could not save units.json: {e}")
 
     def _on_batch_import(self):
         """Parse all source MD files at once and update status icons."""

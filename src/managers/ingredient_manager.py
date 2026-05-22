@@ -55,6 +55,31 @@ class IngredientManager:
     def get_all(self) -> list[Ingredient]:
         return list(self._ingredients.values())
 
+    def update(self, key: str, name: str | None = None,
+               aliases: list[str] | None = None, category: str | None = None) -> None:
+        """Update an existing ingredient's fields and rebuild the index."""
+        ing = self._ingredients.get(key)
+        if ing is None:
+            return
+        if name is not None:
+            ing.name = name
+            new_key = name.lower().replace(" ", "_")
+            if new_key != key:
+                del self._ingredients[key]
+                ing.key = new_key
+                self._ingredients[new_key] = ing
+        if aliases is not None:
+            ing.aliases = aliases
+        if category is not None:
+            ing.category = category
+        self._rebuild_index()
+
+    def remove(self, key: str) -> None:
+        """Remove an ingredient by key."""
+        if key in self._ingredients:
+            del self._ingredients[key]
+            self._rebuild_index()
+
     def _rebuild_index(self):
         self._name_index.clear()
         for key, ing in self._ingredients.items():

@@ -4,6 +4,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
+    QCompleter,
     QDialog,
     QGroupBox,
     QHBoxLayout,
@@ -37,6 +38,18 @@ class MergeDialog(QDialog):
         self.setMinimumWidth(480)
         self._setup_ui(preselect_a, preselect_b)
 
+    def _make_combo(self) -> QComboBox:
+        """Create an editable combo box with search completer."""
+        combo = QComboBox()
+        combo.addItems(self._names)
+        combo.setEditable(True)
+        combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        completer = QCompleter(self._names)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        combo.setCompleter(completer)
+        return combo
+
     def _setup_ui(self, preselect_a: str | None, preselect_b: str | None) -> None:
         layout = QVBoxLayout(self)
 
@@ -47,16 +60,14 @@ class MergeDialog(QDialog):
         # Ingredient A
         row_a = QHBoxLayout()
         row_a.addWidget(QLabel("食材 A:"))
-        self._combo_a = QComboBox()
-        self._combo_a.addItems(self._names)
+        self._combo_a = self._make_combo()
         row_a.addWidget(self._combo_a, 1)
         sel_layout.addLayout(row_a)
 
         # Ingredient B
         row_b = QHBoxLayout()
         row_b.addWidget(QLabel("食材 B:"))
-        self._combo_b = QComboBox()
-        self._combo_b.addItems(self._names)
+        self._combo_b = self._make_combo()
         row_b.addWidget(self._combo_b, 1)
         sel_layout.addLayout(row_b)
 

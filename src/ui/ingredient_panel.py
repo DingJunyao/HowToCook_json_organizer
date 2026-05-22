@@ -1,12 +1,15 @@
 # src/ui/ingredient_panel.py
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
+    QPushButton,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -21,9 +24,12 @@ CATEGORIES = ["蔬菜", "肉类", "水产", "禽蛋", "豆制品", "主食/谷�
 class IngredientPanel(QWidget):
     """Right-panel ingredient library reference for RecipeTab."""
 
+    ingredient_changed = Signal()  # emitted when ingredients are modified
+
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._mgr: IngredientManager | None = None
+        self._selected_ingredient = None  # currently selected Ingredient object
         self._setup_ui()
 
     # ------------------------------------------------------------------
@@ -54,7 +60,7 @@ class IngredientPanel(QWidget):
         self._tree.currentItemChanged.connect(self._on_item_changed)
         layout.addWidget(self._tree, stretch=1)
 
-        # Detail area (shown when an ingredient is selected)
+        # Editable detail area
         self._detail_frame = QFrame()
         self._detail_frame.setFrameShape(QFrame.StyledPanel)
         self._detail_frame.setVisible(False)
@@ -65,15 +71,50 @@ class IngredientPanel(QWidget):
         self._detail_title.setStyleSheet("font-weight: bold; font-size: 13px;")
         detail_layout.addWidget(self._detail_title)
 
-        self._detail_aliases = QLabel()
-        self._detail_aliases.setWordWrap(True)
-        detail_layout.addWidget(self._detail_aliases)
+        # Name
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("名称:"))
+        self._name_edit = QLineEdit()
+        self._name_edit.textChanged.connect(self._on_field_changed)
+        name_row.addWidget(self._name_edit, 1)
+        detail_layout.addLayout(name_row)
 
-        self._detail_category = QLabel()
-        detail_layout.addWidget(self._detail_category)
+        # Aliases
+        alias_row = QHBoxLayout()
+        alias_row.addWidget(QLabel("别名:"))
+        self._alias_edit = QLineEdit()
+        self._alias_edit.setPlaceholderText("多个别名用逗号分隔")
+        self._alias_edit.textChanged.connect(self._on_field_changed)
+        alias_row.addWidget(self._alias_edit, 1)
+        detail_layout.addLayout(alias_row)
 
+        # Category
+        cat_row = QHBoxLayout()
+        cat_row.addWidget(QLabel("分类:"))
+        self._category_combo = QComboBox()
+        self._category_combo.addItems(CATEGORIES)
+        self._category_combo.setEditable(True)
+        self._category_combo.currentIndexChanged.connect(self._on_field_changed)
+        cat_row.addWidget(self._category_combo, 1)
+        detail_layout.addLayout(cat_row)
+
+        # USDA status (read-only)
         self._detail_usda = QLabel()
         detail_layout.addWidget(self._detail_usda)
+
+        # Action buttons
+        btn_row = QHBoxLayout()
+        self._save_btn = QPushButton("保存修改")
+        self._save_btn.setEnabled(False)
+        self._save_btn.clicked.connect(self._on_save)
+        self._delete_btn = QPushButton("删除")
+        self._delete_btn.clicked.connect(self._on_delete)
+        self._merge_btn = QPushButton("合并...")
+        self._merge_btn.clicked.connect(self._on_merge)
+        btn_row.addWidget(self._save_btn)
+        btn_row.addWidget(self._delete_btn)
+        btn_row.addWidget(self._merge_btn)
+        detail_layout.addLayout(btn_row)
 
         layout.addWidget(self._detail_frame)
 
@@ -104,7 +145,7 @@ class IngredientPanel(QWidget):
         for cat in CATEGORIES:
             items = by_category[cat]
             cat_item = QTreeWidgetItem(self._tree, [f"{cat} ({len(items)})"])
-            cat_item.setData(0, Qt.ItemDataRole.UserRole, None)  # category header
+            cat_item.setData(0, Qt.ItemDataRole.UserRole, None)
             cat_item.setExpanded(True)
             cat_item.setFlags(cat_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
 
@@ -114,6 +155,7 @@ class IngredientPanel(QWidget):
                 child.setData(0, Qt.ItemDataRole.UserRole, ing)
 
         self._detail_frame.setVisible(False)
+        self._selected_ingredient = None
 
     def get_all_ingredient_names(self) -> list[str]:
         """Return all ingredient names and aliases (for auto-completion)."""
@@ -130,26 +172,121 @@ class IngredientPanel(QWidget):
     # ------------------------------------------------------------------
 
     def _on_search(self, text: str):
-        """Filter the ingredient list based on search text."""
         self.refresh_list()
 
     def _on_item_changed(self, current: QTreeWidgetItem | None, _previous: QTreeWidgetItem | None):
-        """Show detail when an ingredient item is selected."""
         if current is None:
             self._detail_frame.setVisible(False)
+            self._selected_ingredient = None
             return
 
         ing = current.data(0, Qt.ItemDataRole.UserRole)
         if ing is None:
-            # Category header clicked — hide detail
             self._detail_frame.setVisible(False)
+            self._selected_ingredient = None
             return
 
+        self._selected_ingredient = ing
+        self._populate_detail(ing)
+        self._detail_frame.setVisible(True)
+
+    def _populate_detail(self, ing):
+        """Fill the detail form with ingredient data."""
+        self._name_edit.blockSignals(True)
+        self._alias_edit.blockSignals(True)
+        self._category_combo.blockSignals(True)
+
         self._detail_title.setText(ing.name)
-        self._detail_aliases.setText(
-            f"别名: {', '.join(ing.aliases)}" if ing.aliases else "别名: （无）"
-        )
-        self._detail_category.setText(f"分类: {ing.category}")
+        self._name_edit.setText(ing.name)
+        self._alias_edit.setText(", ".join(ing.aliases))
+
+        idx = self._category_combo.findText(ing.category)
+        if idx >= 0:
+            self._category_combo.setCurrentIndex(idx)
+        else:
+            self._category_combo.setEditText(ing.category)
+
         usda_status = "已匹配" if ing.usda_match_status == "matched" else "未匹配"
         self._detail_usda.setText(f"USDA: {usda_status}")
-        self._detail_frame.setVisible(True)
+
+        self._save_btn.setEnabled(False)
+
+        self._name_edit.blockSignals(False)
+        self._alias_edit.blockSignals(False)
+        self._category_combo.blockSignals(False)
+
+    def _on_field_changed(self, *_):
+        """Enable save button when any field is modified."""
+        self._save_btn.setEnabled(True)
+
+    def _on_save(self):
+        """Save edited fields back to the ingredient."""
+        if self._mgr is None or self._selected_ingredient is None:
+            return
+
+        ing = self._selected_ingredient
+        new_name = self._name_edit.text().strip()
+        if not new_name:
+            QMessageBox.warning(self, "无效输入", "食材名称不能为空。")
+            return
+
+        # Check name conflict (different ingredient with same name)
+        existing = self._mgr.get_by_name(new_name)
+        if existing is not None and existing.key != ing.key:
+            QMessageBox.warning(
+                self, "名称冲突",
+                f"已存在名为「{new_name}」的食材，请使用其他名称或通过合并功能处理。"
+            )
+            return
+
+        # Update via manager
+        self._mgr.update(
+            key=ing.key,
+            name=new_name,
+            aliases=[a.strip() for a in self._alias_edit.text().strip().split(",") if a.strip()],
+            category=self._category_combo.currentText().strip(),
+        )
+
+        self._save_btn.setEnabled(False)
+        self.ingredient_changed.emit()
+        self.refresh_list()
+
+    def _on_delete(self):
+        """Delete the selected ingredient after confirmation."""
+        if self._mgr is None or self._selected_ingredient is None:
+            return
+
+        name = self._selected_ingredient.name
+        reply = QMessageBox.question(
+            self, "确认删除",
+            f"确定要删除食材「{name}」吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        self._mgr.remove(self._selected_ingredient.key)
+        self._selected_ingredient = None
+        self._detail_frame.setVisible(False)
+        self.ingredient_changed.emit()
+        self.refresh_list()
+
+    def _on_merge(self):
+        """Open merge dialog for the selected ingredient."""
+        if self._mgr is None or self._selected_ingredient is None:
+            return
+
+        from src.ui.merge_dialog import MergeDialog
+        dlg = MergeDialog(
+            self._mgr,
+            preselect_a=self._selected_ingredient.name,
+            parent=self,
+        )
+        if dlg.exec():
+            keep_name, remove_name = dlg.get_merge_params()
+            self._mgr.merge(keep_name, remove_name)
+            self._selected_ingredient = None
+            self._detail_frame.setVisible(False)
+            self.ingredient_changed.emit()
+            self.refresh_list()
