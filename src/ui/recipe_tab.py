@@ -1,6 +1,13 @@
 # src/ui/recipe_tab.py
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QToolBar
+from PySide6.QtWidgets import (
+    QWidget,
+    QHBoxLayout,
+    QVBoxLayout,
+    QPushButton,
+    QToolBar,
+    QMessageBox,
+)
 
 from src.parsers.markdown_parser import MarkdownParser
 from src.ui.ingredient_panel import IngredientPanel
@@ -43,9 +50,14 @@ class RecipeTab(QWidget):
 
         outer_layout.addWidget(main_widget)
 
+        # Internal state
+        self._im = None  # IngredientManager
+        self._current_source_path: str | None = None
+
         # Connect signals
         self.source_panel.file_selected.connect(self._on_file_selected)
         self.source_panel.output_file_selected.connect(self._on_output_file_selected)
+        self.recipe_form.save_requested.connect(self._on_save)
 
         # Parsed results cache: {relative_path: parsed_dict}
         self._parsed_results: dict = {}
@@ -60,14 +72,36 @@ class RecipeTab(QWidget):
 
     def set_ingredient_manager(self, mgr):
         """Propagate the IngredientManager to the ingredient panel."""
+        self._im = mgr
         self.ingredient_panel.set_ingredient_manager(mgr)
 
     # ------------------------------------------------------------------
     # Slots
     # ------------------------------------------------------------------
 
+    def _confirm_discard_unsaved(self) -> bool:
+        """If the form has unsaved changes, ask the user to confirm.
+
+        Returns True if it is OK to proceed (discard / no unsaved changes).
+        """
+        if not self.recipe_form.is_dirty():
+            return True
+        reply = QMessageBox.question(
+            self,
+            "未保存的更改",
+            "当前菜谱未保存，是否继续？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return reply == QMessageBox.StandardButton.Yes
+
     def _on_file_selected(self, rel_path: str):
         """Load MD -> parse with MarkdownParser -> populate RecipeForm."""
+        if not self._confirm_discard_unsaved():
+            return
+
+        self._current_source_path = rel_path
+
         # Use cached result if available from batch import
         if rel_path in self._parsed_results:
             self.recipe_form.load_recipe(self._parsed_results[rel_path])
@@ -90,6 +124,9 @@ class RecipeTab(QWidget):
         2. Populates the form with the data
         3. Tries to find and display the source MD in the preview area
         """
+        if not self._confirm_discard_unsaved():
+            return
+
         fm = self.source_panel._fm
         if fm is None:
             return
@@ -100,6 +137,7 @@ class RecipeTab(QWidget):
             # Try to load the corresponding source MD for preview
             source_file = data.get("source_file", "")
             if source_file:
+                self._current_source_path = source_file
                 try:
                     md_content = fm.load_markdown(source_file)
                     self.source_panel.preview.setPlainText(md_content)
@@ -112,6 +150,7 @@ class RecipeTab(QWidget):
                     if src.stem == json_stem:
                         try:
                             src_rel = str(src.relative_to(fm.source_dir))
+                            self._current_source_path = src_rel
                             md_content = fm.load_markdown(src_rel)
                             self.source_panel.preview.setPlainText(md_content)
                         except Exception:
@@ -119,6 +158,74 @@ class RecipeTab(QWidget):
                         break
         except Exception as e:
             print(f"[RecipeTab] Error loading output recipe: {e}")
+
+    def _on_save(self, data: dict):
+        """Handle save_requested from RecipeForm.
+
+        1. Write recipe JSON via FileManager
+        2. Sync new ingredient names to IngredientManager + ingredients.json
+        3. Refresh the source panel tree (update check marks)
+        4. Show a status bar message
+        5. Mark the form as clean
+        """
+        fm = self.source_panel._fm
+        if fm is None:
+            print("[RecipeTab] Cannot save: no FileManager")
+            return
+
+        recipe_name = data.get("name", "未命名")
+
+        # Determine output relative path
+        source_path = data.get("source_file") or self._current_source_path or ""
+        if source_path:
+            # Replace .md extension with .json, keep directory structure
+            output_rel = source_path.rsplit(".", 1)[0] + ".json"
+        else:
+            # Fallback: put in root with recipe name
+            output_rel = f"{recipe_name}.json"
+
+        # Update source_file in data
+        data["source_file"] = source_path
+
+        # 1. Save recipe JSON
+        try:
+            fm.save_recipe(output_rel, data)
+        except Exception as e:
+            QMessageBox.critical(self, "保存失败", f"无法保存菜谱: {e}")
+            return
+
+        # 2. Sync ingredients
+        if self._im is not None:
+            new_names = []
+            for ing in data.get("ingredients", []):
+                ing_name = ing.get("ingredient_name", "").strip()
+                if not ing_name:
+                    continue
+                existing = self._im.get_by_name(ing_name)
+                if existing is None:
+                    self._im.add(name=ing_name)
+                    new_names.append(ing_name)
+
+            # Save ingredients.json
+            if new_names:
+                try:
+                    ingredients_data = {}
+                    for ing in self._im.get_all():
+                        ingredients_data[ing.key] = ing.to_dict()
+                    fm.save_ingredients(ingredients_data)
+                except Exception as e:
+                    print(f"[RecipeTab] Warning: could not save ingredients.json: {e}")
+
+        # 3. Refresh source panel tree (updates check marks)
+        self.source_panel.refresh_tree()
+
+        # 4. Show status message via toolbar
+        self._toolbar.showMessage(f"已保存: {recipe_name}", 3000)
+
+        # 5. Mark form as clean
+        self.recipe_form.set_clean()
+
+        print(f"[RecipeTab] 已保存: {recipe_name}")
 
     def _on_batch_import(self):
         """Parse all source MD files at once and update status icons."""
