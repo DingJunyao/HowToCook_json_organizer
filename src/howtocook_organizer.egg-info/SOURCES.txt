@@ -1,0 +1,12 @@
+pyproject.toml
+src/__init__.py
+src/howtocook_organizer.egg-info/PKG-INFO
+src/howtocook_organizer.egg-info/SOURCES.txt
+src/howtocook_organizer.egg-info/dependency_links.txt
+src/howtocook_organizer.egg-info/entry_points.txt
+src/howtocook_organizer.egg-info/requires.txt
+src/howtocook_organizer.egg-info/top_level.txt
+src/managers/__init__.py
+src/models/__init__.py
+src/parsers/__init__.py
+src/ui/__init__.py

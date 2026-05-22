@@ -1,0 +1,19 @@
+[project]
+name = "howtocook-organizer"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "PySide6>=6.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-qt>=4.2",
+]
+
+[project.scripts]
+howtocook-organizer = "src.ui.main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
