@@ -50,9 +50,12 @@ class NutritionIngredientList(QWidget):
         self._search_bar.textChanged.connect(self._on_search_changed)
         layout.addWidget(self._search_bar)
 
-        # Ingredient tree
+        # Ingredient tree (multi-select via Ctrl+Click)
         self._tree = QTreeWidget()
         self._tree.setHeaderHidden(True)
+        self._tree.setSelectionMode(
+            QTreeWidget.SelectionMode.ExtendedSelection
+        )
         self._tree.itemClicked.connect(self._on_item_clicked)
         layout.addWidget(self._tree)
 
@@ -99,6 +102,15 @@ class NutritionIngredientList(QWidget):
             return None
         key = item.data(0, 0x0100)
         return key if isinstance(key, str) else None
+
+    def get_selected_keys(self) -> list[str]:
+        """Return keys of all selected ingredient items (excludes category items)."""
+        keys: list[str] = []
+        for item in self._tree.selectedItems():
+            key = item.data(0, 0x0100)
+            if isinstance(key, str):
+                keys.append(key)
+        return keys
 
     # -- private helpers -----------------------------------------------------
 
