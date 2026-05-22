@@ -219,8 +219,10 @@ class RecipeTab(QWidget):
         # 3. Refresh source panel tree (updates check marks)
         self.source_panel.refresh_tree()
 
-        # 4. Show status message via toolbar
-        self._toolbar.showMessage(f"已保存: {recipe_name}", 3000)
+        # 4. Show status message
+        status_bar = self.window().statusBar() if self.window() else None
+        if status_bar is not None:
+            status_bar.showMessage(f"已保存: {recipe_name}", 3000)
 
         # 5. Mark form as clean
         self.recipe_form.set_clean()

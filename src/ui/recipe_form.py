@@ -1,7 +1,7 @@
 # src/ui/recipe_form.py
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -51,9 +51,13 @@ STEP_COLUMNS = ["序号", "描述", "用时(分钟)", "备注"]
 class RecipeForm(QWidget):
     """Scrollable form for editing a single recipe."""
 
+    save_requested = Signal(dict)  # emitted when user clicks Save
+
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._dirty = False
         self._build_ui()
+        self._connect_change_signals()
 
     # ------------------------------------------------------------------
     # UI construction
@@ -249,10 +253,43 @@ class RecipeForm(QWidget):
         row.addWidget(self.clear_btn)
         row.addStretch()
 
-        self.save_btn.clicked.connect(lambda: print("save clicked"))
+        self.save_btn.clicked.connect(self._on_save_clicked)
         self.clear_btn.clicked.connect(self.clear_form)
 
         self._layout.addLayout(row)
+
+    # ------------------------------------------------------------------
+    # Dirty tracking & signal wiring
+    # ------------------------------------------------------------------
+
+    def _connect_change_signals(self):
+        """Connect all editable widgets to mark the form as dirty."""
+        self.name_edit.textChanged.connect(self._mark_dirty)
+        self.difficulty_combo.editTextChanged.connect(self._mark_dirty)
+        self.difficulty_combo.currentIndexChanged.connect(self._mark_dirty)
+        self.category_combo.editTextChanged.connect(self._mark_dirty)
+        self.category_combo.currentIndexChanged.connect(self._mark_dirty)
+        self.servings_spin.valueChanged.connect(self._mark_dirty)
+        self.original_servings_spin.valueChanged.connect(self._mark_dirty)
+        self.ingredients_table.cellChanged.connect(self._mark_dirty)
+        self.steps_table.cellChanged.connect(self._mark_dirty)
+        self.tips_edit.textChanged.connect(self._mark_dirty)
+
+    def _mark_dirty(self, *_):
+        self._dirty = True
+
+    def is_dirty(self) -> bool:
+        """Return whether the form has unsaved changes."""
+        return self._dirty
+
+    def set_clean(self):
+        """Mark the form as having no unsaved changes."""
+        self._dirty = False
+
+    def _on_save_clicked(self):
+        """Collect form data and emit save_requested."""
+        data = self.collect_data()
+        self.save_requested.emit(data)
 
     # ------------------------------------------------------------------
     # Public API
@@ -261,6 +298,7 @@ class RecipeForm(QWidget):
     def load_recipe(self, data: dict) -> None:
         """Populate the form from parsed Markdown or existing JSON data."""
         self.clear_form()
+        self._dirty = False  # clear_form triggers change signals; reset after
 
         # Basic info
         self.name_edit.setText(data.get("name", ""))
@@ -295,6 +333,8 @@ class RecipeForm(QWidget):
         tips = data.get("tips", [])
         if tips:
             self.tips_edit.setPlainText("\n".join(tips))
+
+        self._dirty = False  # reset after all fields are populated
 
     def collect_data(self) -> dict:
         """Gather all form fields into a dict matching the Recipe JSON structure."""
@@ -335,6 +375,7 @@ class RecipeForm(QWidget):
         self.ingredients_table.setRowCount(0)
         self.steps_table.setRowCount(0)
         self.tips_edit.clear()
+        self._dirty = False
 
     # ------------------------------------------------------------------
     # Internal helpers
