@@ -1,7 +1,8 @@
 # src/ui/recipe_tab.py
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QVBoxLayout
+from PySide6.QtWidgets import QWidget, QHBoxLayout
 
 from src.parsers.markdown_parser import MarkdownParser
+from src.ui.ingredient_panel import IngredientPanel
 from src.ui.recipe_form import RecipeForm
 from src.ui.source_panel import SourcePanel
 
@@ -17,15 +18,12 @@ class RecipeTab(QWidget):
         # 中栏 - 编辑区
         self.recipe_form = RecipeForm()
 
-        # 右栏 - 参考区
-        right = QVBoxLayout()
-        right.addWidget(QLabel("参考区"))
-        right_w = QWidget()
-        right_w.setLayout(right)
+        # 右栏 - 食材库参考
+        self.ingredient_panel = IngredientPanel()
 
         layout.addWidget(self.source_panel, 1)
         layout.addWidget(self.recipe_form, 2)
-        layout.addWidget(right_w, 1)
+        layout.addWidget(self.ingredient_panel, 1)
 
         # Connect signals
         self.source_panel.file_selected.connect(self._on_file_selected)
@@ -37,6 +35,10 @@ class RecipeTab(QWidget):
     def set_file_manager(self, fm):
         """Propagate the FileManager to the source panel."""
         self.source_panel.set_file_manager(fm)
+
+    def set_ingredient_manager(self, mgr):
+        """Propagate the IngredientManager to the ingredient panel."""
+        self.ingredient_panel.set_ingredient_manager(mgr)
 
     # ------------------------------------------------------------------
     # Slots
