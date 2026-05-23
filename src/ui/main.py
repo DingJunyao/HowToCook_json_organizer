@@ -6,14 +6,16 @@ from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
     QMenuBar,
+    QPushButton,
     QTabWidget,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThread, Signal
 
 from src.managers.file_manager import FileManager
 from src.managers.ingredient_manager import IngredientManager
 from src.managers.nutrition_matcher import NutritionMatcher
 from src.managers.unit_manager import UnitManager
+from src.managers.git_utils import GitRepo
 from src.ui.settings_dialog import SettingsDialog
 
 CATEGORY_EN_TO_ZH = {
@@ -48,11 +50,20 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.recipe_tab, "菜谱编辑")
         self.tabs.addTab(self.nutrition_tab, "食材营养管理")
 
-        # Menu bar — Settings action
+        # Menu bar
         menu_bar: QMenuBar = self.menuBar()
         settings_menu = menu_bar.addMenu("工具")
         settings_action = settings_menu.addAction("设置...")
         settings_action.triggered.connect(self._open_settings)
+
+        self._sync_action = settings_menu.addAction("仓库同步")
+        self._sync_action.triggered.connect(self._on_git_sync)
+
+        # Status bar with sync button
+        self._status_sync_btn = QPushButton("⟳ 同步")
+        self._status_sync_btn.clicked.connect(self._on_git_sync)
+        self._status_sync_btn.setToolTip("仓库同步：拉取、提交、推送")
+        self.statusBar().addPermanentWidget(self._status_sync_btn)
 
         self.statusBar().showMessage("就绪")
 
@@ -107,7 +118,14 @@ class MainWindow(QMainWindow):
 
         # Unit manager
         self._um = UnitManager()
-        # Load persisted custom units if available
+        # Discover units from existing recipe JSON files
+        recipe_files = self._fm.list_output_recipes()
+        discovered_units = self._um.discover_from_recipes(recipe_files)
+        if discovered_units:
+            new_count = self._um.add_discovered_units(discovered_units)
+            if new_count:
+                print(f"[MainWindow] Discovered {new_count} new unit(s) from recipes: {discovered_units}")
+        # Also load persisted custom units if available
         units_path = output_dir / "out" / "units.json"
         if units_path.exists():
             import json as _json
@@ -168,6 +186,104 @@ class MainWindow(QMainWindow):
         return result
 
     # ------------------------------------------------------------------
+    # Git sync
+    # ------------------------------------------------------------------
+
+    def _run_git_sync(self) -> None:
+        """Run startup sync dialog if output_dir is a valid git repo."""
+        try:
+            if self._fm is None:
+                return
+            output_dir = self._fm.output_dir
+            repo = GitRepo(output_dir)
+            if not repo.is_git_available():
+                return
+            if not repo.is_valid_repo():
+                return
+            if not repo.has_remote():
+                return
+
+            from src.ui.git_sync_dialog import GitSyncDialog
+            dlg = GitSyncDialog(output_dir, parent=self)
+            dlg.exec()
+        except Exception as e:
+            # Ensure sync errors never prevent the main window from showing
+            import logging
+            logging.warning(f"Git sync failed: {e}")
+            pass
+
+    def _on_git_sync(self) -> None:
+        """Menu/status-bar sync: pull → add → commit → push directly."""
+        if self._fm is None:
+            self.statusBar().showMessage("请先设置仓库路径", 3000)
+            return
+        output_dir = self._fm.output_dir
+        repo = GitRepo(output_dir)
+
+        if not repo.is_git_available():
+            self.statusBar().showMessage("未找到 git", 3000)
+            return
+        if not repo.is_valid_repo():
+            self.statusBar().showMessage("输出目录不是 git 仓库", 3000)
+            return
+        if not repo.has_remote():
+            self.statusBar().showMessage("仓库没有配置远程", 3000)
+            return
+
+        self._sync_action.setEnabled(False)
+        self._status_sync_btn.setEnabled(False)
+        self.statusBar().showMessage("正在同步...")
+
+        self._sync_worker = _ManualSyncWorker(repo)
+        self._sync_worker.progress.connect(self.statusBar().showMessage)
+        self._sync_worker.done.connect(self._on_sync_done)
+        self._sync_worker.error_occurred.connect(self._on_sync_error)
+        self._sync_worker.conflict.connect(self._on_sync_conflict)
+        self._sync_worker.start()
+
+    def _on_sync_done(self, message: str) -> None:
+        self._sync_action.setEnabled(True)
+        self._status_sync_btn.setEnabled(True)
+        self.statusBar().showMessage(message, 5000)
+
+    def _on_sync_error(self, message: str) -> None:
+        self._sync_action.setEnabled(True)
+        self._status_sync_btn.setEnabled(True)
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.warning(self, "同步失败", message)
+
+    def _on_sync_conflict(self, conflicts: list[str]) -> None:
+        from src.ui.git_sync_dialog import GitSyncDialog
+        repo = GitRepo(self._fm.output_dir)
+        continue_ok = GitSyncDialog.show_conflict_dialog(repo, conflicts, parent=self)
+        if continue_ok:
+            # User resolved conflicts externally, try to finish
+            self._finish_sync_after_conflict(repo)
+        else:
+            self._sync_action.setEnabled(True)
+            self._status_sync_btn.setEnabled(True)
+            self.statusBar().showMessage("已放弃合并")
+
+    def _finish_sync_after_conflict(self, repo: GitRepo) -> None:
+        """After user resolves conflicts, add → commit → push."""
+        self.statusBar().showMessage("正在提交并推送...")
+        repo.add_all()
+
+        changes = repo.check_local_changes()
+        msg = GitRepo.format_commit_message(changes.modified_files, changes.untracked_files)
+        ok, result = repo.commit(msg)
+        if not ok:
+            self._sync_action.setEnabled(True)
+            self._status_sync_btn.setEnabled(True)
+            self.statusBar().showMessage(result, 5000)
+            return
+
+        ok, result = repo.push()
+        self._sync_action.setEnabled(True)
+        self._status_sync_btn.setEnabled(True)
+        self.statusBar().showMessage(result if ok else result, 5000)
+
+    # ------------------------------------------------------------------
     # Slots
     # ------------------------------------------------------------------
 
@@ -179,6 +295,58 @@ class MainWindow(QMainWindow):
             self._apply_config(config)
 
 
+class _ManualSyncWorker(QThread):
+    """Background worker for menu-mode sync (direct pull→commit→push)."""
+    progress = Signal(str)
+    done = Signal(str)
+    error_occurred = Signal(str)
+    conflict = Signal(list)
+
+    def __init__(self, repo: GitRepo):
+        super().__init__()
+        self.repo = repo
+
+    def run(self) -> None:
+        try:
+            # 1. Pull (with stash if needed)
+            self.progress.emit("正在拉取远程更新...")
+            success, msg, _had_stash, conflicts = self.repo.pull_with_stash()
+            self.progress.emit(msg)
+
+            if not success:
+                if conflicts:
+                    self.conflict.emit(conflicts)
+                else:
+                    self.error_occurred.emit(msg)
+                return
+
+            # 2. Check for local changes
+            self.progress.emit("正在检查本地更改...")
+            changes = self.repo.check_local_changes()
+
+            if changes.has_changes:
+                self.progress.emit("正在暂存更改...")
+                self.repo.add_all()
+
+                commit_msg = GitRepo.format_commit_message(
+                    changes.modified_files, changes.untracked_files
+                )
+                self.progress.emit(f"正在提交: {commit_msg}")
+                ok, result = self.repo.commit(commit_msg)
+                if not ok:
+                    self.progress.emit(f"提交: {result}")
+                else:
+                    self.progress.emit("正在推送到远程...")
+                    ok, push_msg = self.repo.push()
+                    self.progress.emit(push_msg)
+            else:
+                self.progress.emit("无本地更改，无需提交")
+
+            self.done.emit("同步完成")
+        except Exception as e:
+            self.error_occurred.emit(f"同步失败: {e}")
+
+
 def main():
     app = QApplication(sys.argv)
     window = MainWindow()
@@ -186,6 +354,7 @@ def main():
         (screen := app.primaryScreen().availableGeometry()).center().x() - window.width() // 2,
         screen.center().y() - window.height() // 2,
     )
+    window._run_git_sync()
     window.show()
     sys.exit(app.exec())
 

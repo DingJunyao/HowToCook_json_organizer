@@ -3,13 +3,17 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -92,9 +96,12 @@ class UnitPanel(QWidget):
         self._delete_btn.clicked.connect(self._on_delete)
         self._merge_btn = QPushButton("合并...")
         self._merge_btn.clicked.connect(self._on_merge)
+        self._split_btn = QPushButton("拆分别名...")
+        self._split_btn.clicked.connect(self._on_split)
         btn_row.addWidget(self._save_btn)
         btn_row.addWidget(self._delete_btn)
         btn_row.addWidget(self._merge_btn)
+        btn_row.addWidget(self._split_btn)
         detail_layout.addLayout(btn_row)
 
         layout.addWidget(self._detail_frame)
@@ -111,9 +118,9 @@ class UnitPanel(QWidget):
 
         rename_row = QHBoxLayout()
         self._rename_from = QComboBox()
-        self._rename_from.setEditable(True)
+        self._rename_from.setEditable(False)
         self._rename_to = QComboBox()
-        self._rename_to.setEditable(True)
+        self._rename_to.setEditable(False)
         self._rename_btn = QPushButton("替换")
         self._rename_btn.clicked.connect(self._on_batch_rename)
         rename_row.addWidget(QLabel("从:"))
@@ -224,14 +231,28 @@ class UnitPanel(QWidget):
         if self._mgr is None or self._selected_unit is None:
             return
         name = self._selected_unit.name
-        reply = QMessageBox.question(
-            self, "确认删除", f"确定要删除单位「{name}」吗？",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
+        # Ask user to pick a replacement unit before deleting
+        all_names = self._mgr.get_display_names()
+        other_names = [n for n in all_names if n != name]
+        if other_names:
+            from PySide6.QtWidgets import QInputDialog
+            replace_name, ok = QInputDialog.getItem(
+                self, "选择替换单位",
+                f"删除「{name}」后，请选择一个单位作为替代（选空则不替换）：",
+                ["(无)"] + other_names,
+                0,
+                False,
+            )
+            if not ok:
+                return
+            if replace_name == "(无)":
+                replace_name = ""
+        else:
+            replace_name = ""
+
         self._mgr.remove(self._selected_unit.key)
+        if replace_name:
+            self.unit_changed.emit(name, replace_name)
         self._selected_unit = None
         self._detail_frame.setVisible(False)
         self.units_updated.emit()
@@ -270,3 +291,73 @@ class UnitPanel(QWidget):
         if reply != QMessageBox.StandardButton.Yes:
             return
         self.unit_changed.emit(old_name, new_name)
+
+    def _on_split(self):
+        """Split selected aliases of the current unit into standalone units."""
+        if self._mgr is None or self._selected_unit is None:
+            return
+        unit = self._selected_unit
+        if not unit.aliases:
+            QMessageBox.information(self, "拆分别名", f"「{unit.name}」没有可拆分的别名。")
+            return
+
+        # Build a dialog with checkboxes for each alias
+        dlg = _SplitAliasDialog(unit.aliases, unit.name, parent=self)
+        if not dlg.exec():
+            return
+        to_split = dlg.get_selected_aliases()
+        if not to_split:
+            return
+
+        # For each selected alias, create a new standalone unit
+        for alias_name in to_split:
+            self._mgr.add(alias_name, [alias_name])
+
+        # Remove the selected aliases from the original unit
+        remaining_aliases = [a for a in unit.aliases if a not in to_split]
+        self._mgr.update(key=unit.key, aliases=remaining_aliases)
+
+        self._selected_unit = None
+        self._detail_frame.setVisible(False)
+        self.units_updated.emit()
+        self.refresh_list()
+
+
+class _SplitAliasDialog(QMessageBox):
+    """Dialog to select which aliases to split into standalone units."""
+
+    def __init__(self, aliases: list[str], unit_name: str, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setWindowTitle("拆分别名")
+        self.setText(f"选择要从「{unit_name}」中拆出的别名：")
+        self.setIcon(QMessageBox.Icon.Question)
+        self.setStandardButtons(
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
+        )
+
+        # Build checkbox list
+        self._checkboxes: list[QCheckBox] = []
+        for alias in sorted(aliases):
+            cb = QCheckBox(alias)
+            cb.setChecked(True)  # default all selected
+            self._checkboxes.append(cb)
+
+        layout = self.layout()
+        if layout:
+            container = QWidget()
+            v = QVBoxLayout(container)
+            for cb in self._checkboxes:
+                v.addWidget(cb)
+            v.addStretch()
+            # Find where to insert in QMessageBox layout
+            # QMessageBox uses a QGridLayout; insert after the label
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                if item and isinstance(item.widget(), QLabel):
+                    # Insert after the text label
+                    row = layout.getItemPosition(i)[0]
+                    layout.addWidget(container, row + 1, 0, 1, layout.columnCount())
+                    break
+
+    def get_selected_aliases(self) -> list[str]:
+        return [cb.text() for cb in self._checkboxes if cb.isChecked()]

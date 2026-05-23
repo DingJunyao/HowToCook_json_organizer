@@ -736,7 +736,7 @@ class RecipeForm(QWidget):
                 if col in combos:
                     editable, enabled, stylesheet, options, cur_idx, cur_text = combos[col]
                     combo = QComboBox()
-                    combo.setEditable(editable)
+                    combo.setEditable(False)  # unit combos are not editable
                     combo.addItems(options)
                     if col == 6:
                         combo.currentIndexChanged.connect(
@@ -744,12 +744,9 @@ class RecipeForm(QWidget):
                         )
                     else:
                         combo.currentIndexChanged.connect(self._mark_dirty)
-                        combo.editTextChanged.connect(self._mark_dirty)
                     idx = combo.findText(cur_text)
                     if idx >= 0:
                         combo.setCurrentIndex(idx)
-                    else:
-                        combo.setEditText(cur_text)
                     # Always write combos in normal state; visual is applied in step 4
                     combo.setEnabled(True)
                     combo.setStyleSheet("")
@@ -942,17 +939,14 @@ class RecipeForm(QWidget):
     def _create_unit_combo(self, selected: str = "") -> QComboBox:
         """Create a QComboBox for the unit column."""
         combo = QComboBox()
-        combo.setEditable(True)
+        combo.setEditable(False)
         if self._um:
             combo.addItems(self._um.get_display_names())
         if selected:
             idx = combo.findText(selected)
             if idx >= 0:
                 combo.setCurrentIndex(idx)
-            else:
-                combo.setEditText(selected)
         combo.currentIndexChanged.connect(self._mark_dirty)
-        combo.editTextChanged.connect(self._mark_dirty)
         return combo
 
     def _create_qty_desc_combo(self, selected: str = "") -> QComboBox:
@@ -989,8 +983,6 @@ class RecipeForm(QWidget):
                 idx = combo.findText(current)
                 if idx >= 0:
                     combo.setCurrentIndex(idx)
-                else:
-                    combo.setEditText(current)
                 combo.blockSignals(False)
 
     def batch_rename_unit(self, old_name: str, new_name: str):

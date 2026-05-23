@@ -1,6 +1,9 @@
 # src/managers/unit_manager.py
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from src.models.unit import Unit, DEFAULT_UNITS
 
 
@@ -19,6 +22,99 @@ class UnitManager:
             unit = Unit(key=key, name=name, aliases=aliases)
             self._units[key] = unit
         self._rebuild_index()
+
+    def discover_from_recipes(self, recipe_files: list[Path]) -> set[str]:
+        """Scan existing recipe JSON files and return all unique units found.
+
+        Returns a set of unit strings extracted from recipe ingredients.
+        """
+        found: set[str] = set()
+        for fp in recipe_files:
+            if not fp.is_file():
+                continue
+            try:
+                data = json.loads(fp.read_text(encoding="utf-8"))
+                for ing in data.get("ingredients", []):
+                    unit = ing.get("unit", "")
+                    if unit:
+                        found.add(unit)
+            except Exception:
+                pass
+        return found
+
+    def add_discovered_units(self, units: set[str]) -> int:
+        """Add units discovered from recipe files that don't already exist.
+
+        Returns the number of newly added units.
+        """
+        added = 0
+        for unit_name in sorted(units):
+            existing = self.get_by_name(unit_name)
+            if existing is None:
+                self.add(unit_name)
+                added += 1
+        return added
+
+    def normalize_aliases(self, recipe_files: list[Path],
+                          unit_name: str) -> dict[str, str]:
+        """Normalize all alias variants of a unit to its primary name across recipe files.
+
+        For the given unit, find all its aliases and replace them with the primary name
+        in all recipe JSON files.
+
+        Returns:
+            Mapping of old_name -> new_name for all aliases that were normalized.
+        """
+        unit = self.get_by_name(unit_name)
+        if unit is None:
+            return {}
+
+        replacements = {}
+        for alias in unit.aliases:
+            if alias != unit.name:
+                replacements[alias] = unit.name
+
+        if not replacements:
+            return {}
+
+        self.update_all_recipes(recipe_files, replacements)
+        return replacements
+
+    def update_all_recipes(self, recipe_files: list[Path],
+                           replacements: dict[str, str]) -> int:
+        """Replace units across all recipe JSON files.
+
+        Args:
+            recipe_files: List of recipe JSON file paths.
+            replacements: Mapping of old_unit -> new_unit.
+
+        Returns:
+            Number of files modified.
+        """
+        if not replacements:
+            return 0
+
+        modified_count = 0
+        for fp in recipe_files:
+            if not fp.is_file():
+                continue
+            try:
+                data = json.loads(fp.read_text(encoding="utf-8"))
+                changed = False
+                for ing in data.get("ingredients", []):
+                    old_unit = ing.get("unit", "")
+                    if old_unit in replacements:
+                        ing["unit"] = replacements[old_unit]
+                        changed = True
+                if changed:
+                    fp.write_text(
+                        json.dumps(data, ensure_ascii=False, indent=2),
+                        encoding="utf-8",
+                    )
+                    modified_count += 1
+            except Exception:
+                pass
+        return modified_count
 
     def add(self, name: str, aliases: list[str] | None = None) -> Unit:
         """Add a new unit. Returns the created Unit."""

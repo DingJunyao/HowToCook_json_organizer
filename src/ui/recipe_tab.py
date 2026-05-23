@@ -305,15 +305,55 @@ class RecipeTab(QWidget):
                 print(f"[RecipeTab] Warning: could not save ingredients.json: {e}")
 
     def _on_unit_batch_rename(self, old_name: str, new_name: str):
-        """Apply unit rename to the current recipe form."""
+        """Apply unit rename to current recipe form and all recipe JSON files.
+
+        Also normalize all aliases to primary names across all files.
+        """
         self.recipe_form.batch_rename_unit(old_name, new_name)
+        # Update all recipe JSON files on disk
+        fm = self.source_panel._fm
+        if fm is not None and self._um is not None:
+            recipe_files = [fm.output_dir / "out" / p.name for p in fm.list_output_recipes()]
+            self._um.update_all_recipes(recipe_files, {old_name: new_name})
+            # Normalize all aliases to primary names (skip if alias is a primary name itself)
+            primary_names = {u.name for u in self._um.get_all()}
+            all_normalizations: dict[str, str] = {}
+            for unit in self._um.get_all():
+                for alias in unit.aliases:
+                    if alias != unit.name and alias not in primary_names:
+                        all_normalizations[alias] = unit.name
+            if all_normalizations:
+                modified = self._um.update_all_recipes(recipe_files, all_normalizations)
+                if modified:
+                    print(f"[RecipeTab] Normalized {modified} recipe file(s): aliases → primary names")
+            # Also apply to current form
+            for old_alias, new_alias in all_normalizations.items():
+                self.recipe_form.batch_rename_unit(old_alias, new_alias)
 
     def _on_units_updated(self):
-        """Sync unit changes: refresh combo boxes in recipe form."""
+        """Sync unit changes: refresh combo boxes in recipe form, normalize aliases, persist."""
         if self._um is not None:
             self.recipe_form.set_unit_manager(self._um)
-        # Persist units
+        # Normalize aliases to primary names across all recipe files.
+        # Only normalize if the alias is NOT itself a primary name of another unit
+        # (this allows split aliases to remain as standalone units).
         fm = self.source_panel._fm
+        if fm is not None and self._um is not None:
+            recipe_files = [fm.output_dir / "out" / p.name for p in fm.list_output_recipes()]
+            primary_names = {u.name for u in self._um.get_all()}
+            all_normalizations: dict[str, str] = {}
+            for unit in self._um.get_all():
+                for alias in unit.aliases:
+                    if alias != unit.name and alias not in primary_names:
+                        all_normalizations[alias] = unit.name
+            if all_normalizations:
+                modified = self._um.update_all_recipes(recipe_files, all_normalizations)
+                if modified:
+                    print(f"[RecipeTab] Normalized {modified} recipe file(s): aliases → primary names")
+            # Also apply to current form
+            for old_name, new_name in all_normalizations.items():
+                self.recipe_form.batch_rename_unit(old_name, new_name)
+        # Persist units
         if fm is not None and self._um is not None:
             try:
                 import json
