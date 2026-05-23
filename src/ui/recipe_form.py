@@ -661,14 +661,47 @@ class RecipeForm(QWidget):
 
         table.blockSignals(True)
 
-        # Collect data from both rows
+        is_ing = table is self.ingredients_table
+        gray = Qt.GlobalColor.gray
+        black = Qt.GlobalColor.black
+
+        # --- Step 1: restore hidden approx values so collect captures real data ---
+        if is_ing:
+            for r in (row, target):
+                key = self._get_approx_key(r)
+                saved = self._approx_values.pop(key, None)
+                if saved is None:
+                    continue
+                for col in (2, 4, 5):
+                    item = table.item(r, col)
+                    if item:
+                        if saved.get(col):
+                            item.setText(saved[col])
+                        item.setForeground(black)
+                        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+                uc = table.cellWidget(r, 3)
+                if isinstance(uc, QComboBox):
+                    uc.setEnabled(True)
+                    uc.setStyleSheet("")
+                    if saved.get(3):
+                        idx = uc.findText(saved[3])
+                        if idx >= 0:
+                            uc.setCurrentIndex(idx)
+                        else:
+                            uc.setEditText(saved[3])
+
+        # --- Step 2: collect data from both rows ---
         def collect_row(r):
             items = {}
             combos = {}
             for col in range(table.columnCount()):
                 item = table.item(r, col)
                 if item is not None:
-                    items[col] = (item.text(), item.foreground(), item.flags(), item.data(Qt.ItemDataRole.UserRole))
+                    items[col] = (
+                        item.text(), item.foreground(), item.flags(),
+                        item.data(Qt.ItemDataRole.UserRole),
+                        item.checkState(),
+                    )
                 w = table.cellWidget(r, col)
                 if w is not None and isinstance(w, QComboBox):
                     combos[col] = (
@@ -684,49 +717,49 @@ class RecipeForm(QWidget):
         src_data = collect_row(row)
         dst_data = collect_row(target)
 
-        # Write swapped data
+        # --- Step 3: write swapped data ---
         def write_row(r, items, combos):
             table.setRowCount(max(table.rowCount(), r + 1))
             for col in range(table.columnCount()):
-                # Clear existing
                 table.setItem(r, col, None)
                 table.removeCellWidget(r, col)
                 if col in items:
-                    text, fg, flags, user_data = items[col]
+                    text, fg, flags, user_data, check_state = items[col]
                     new_item = QTableWidgetItem(text)
                     new_item.setForeground(fg)
                     new_item.setFlags(flags)
                     if user_data is not None:
                         new_item.setData(Qt.ItemDataRole.UserRole, user_data)
+                    if col == 7:
+                        new_item.setCheckState(check_state)
                     table.setItem(r, col, new_item)
                 if col in combos:
                     editable, enabled, stylesheet, options, cur_idx, cur_text = combos[col]
                     combo = QComboBox()
                     combo.setEditable(editable)
                     combo.addItems(options)
-                    # Reconnect signals based on column type
                     if col == 6:
                         combo.currentIndexChanged.connect(
-                            lambda c=combo: self._on_qty_desc_changed(c)
+                            lambda _=None, cb=combo: self._on_qty_desc_changed(cb)
                         )
                     else:
                         combo.currentIndexChanged.connect(self._mark_dirty)
                         combo.editTextChanged.connect(self._mark_dirty)
-                    # Restore selection by text (more reliable than index)
                     idx = combo.findText(cur_text)
                     if idx >= 0:
                         combo.setCurrentIndex(idx)
                     else:
                         combo.setEditText(cur_text)
-                    combo.setEnabled(enabled)
-                    combo.setStyleSheet(stylesheet)
+                    # Always write combos in normal state; visual is applied in step 4
+                    combo.setEnabled(True)
+                    combo.setStyleSheet("")
                     table.setCellWidget(r, col, combo)
 
         write_row(row, dst_data[0], dst_data[1])
         write_row(target, src_data[0], src_data[1])
 
-        # Re-initialize link status and approximate state after writing
-        if table is self.ingredients_table:
+        # --- Step 4: re-apply link status and approximate visual state ---
+        if is_ing:
             for r in (row, target):
                 self._update_link_status(r)
                 self._update_approx_state(r)
@@ -938,11 +971,10 @@ class RecipeForm(QWidget):
 
     def _on_qty_desc_changed(self, combo: QComboBox):
         self._mark_dirty()
-        # Find the row for this combo
-        for row in range(self.ingredients_table.rowCount()):
-            if self.ingredients_table.cellWidget(row, 6) is combo:
-                self._update_approx_state(row)
-                return
+        row = combo.property("_ingredient_row")
+        if row is not None:
+            self._update_approx_state(row)
+            return
 
     def _refresh_unit_combos(self):
         """Refresh all unit combo boxes in the ingredient table."""
@@ -1002,6 +1034,9 @@ class RecipeForm(QWidget):
     def _update_approx_state(self, row: int):
         """When '用量描述' is set, hide quantity/range/unit cells and save their values."""
         combo = self.ingredients_table.cellWidget(row, 6)
+        # Keep the row property in sync so signal handlers can locate the row
+        if isinstance(combo, QComboBox):
+            combo.setProperty("_ingredient_row", row)
         is_approx = isinstance(combo, QComboBox) and combo.currentText() != ""
         gray = Qt.GlobalColor.gray
         black = Qt.GlobalColor.black
