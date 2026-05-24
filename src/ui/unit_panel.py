@@ -1,12 +1,15 @@
 # src/ui/unit_panel.py
 from __future__ import annotations
 
+import json
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -20,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from src.managers.file_manager import FileManager
 from src.managers.unit_manager import UnitManager
 
 
@@ -28,10 +32,12 @@ class UnitPanel(QWidget):
 
     unit_changed = Signal(str, str)  # emitted as (old_name, new_name) after batch rename
     units_updated = Signal()  # emitted when unit list changes
+    navigate_to_recipe = Signal(str)  # emitted when user double-clicks a recipe reference
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._mgr: UnitManager | None = None
+        self._fm: FileManager | None = None
         self._selected_unit = None
         self._setup_ui()
 
@@ -58,6 +64,11 @@ class UnitPanel(QWidget):
         self._tree.setAnimated(True)
         self._tree.currentItemChanged.connect(self._on_item_changed)
         layout.addWidget(self._tree, stretch=1)
+
+        # Add unit button
+        self._add_btn = QPushButton("新建单位")
+        self._add_btn.clicked.connect(self._on_add)
+        layout.addWidget(self._add_btn)
 
         # Editable detail area
         self._detail_frame = QFrame()
@@ -104,6 +115,15 @@ class UnitPanel(QWidget):
         btn_row.addWidget(self._split_btn)
         detail_layout.addLayout(btn_row)
 
+        # Reverse lookup: recipes using this unit
+        self._ref_label = QLabel("引用菜谱:")
+        self._ref_label.setStyleSheet("font-weight: bold; margin-top: 6px;")
+        detail_layout.addWidget(self._ref_label)
+        self._ref_list = QListWidget()
+        self._ref_list.setMaximumHeight(120)
+        self._ref_list.itemDoubleClicked.connect(self._on_ref_double_clicked)
+        detail_layout.addWidget(self._ref_list)
+
         layout.addWidget(self._detail_frame)
 
         # Batch rename section
@@ -139,6 +159,10 @@ class UnitPanel(QWidget):
     def set_unit_manager(self, mgr: UnitManager):
         self._mgr = mgr
         self.refresh_list()
+
+    def set_file_manager(self, fm: FileManager):
+        """Set the file manager for reverse lookup."""
+        self._fm = fm
 
     def refresh_list(self):
         self._tree.clear()
@@ -198,8 +222,33 @@ class UnitPanel(QWidget):
         self._name_edit.blockSignals(False)
         self._alias_edit.blockSignals(False)
 
+        # Reverse lookup
+        self._populate_ref_list(unit)
+
     def _on_field_changed(self, *_):
         self._save_btn.setEnabled(True)
+
+    def _on_add(self):
+        """Create a new unit."""
+        if self._mgr is None:
+            return
+        name, ok = QInputDialog.getText(self, "新建单位", "单位名称:")
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+        if self._mgr.get_by_name(name) is not None:
+            QMessageBox.warning(self, "名称冲突", f"单位「{name}」已存在。")
+            return
+        self._mgr.add(name)
+        self.units_updated.emit()
+        self.refresh_list()
+        # Select the newly added unit
+        for i in range(self._tree.topLevelItemCount()):
+            item = self._tree.topLevelItem(i)
+            unit = item.data(0, Qt.ItemDataRole.UserRole)
+            if unit and unit.name == name:
+                self._tree.setCurrentItem(item)
+                break
 
     def _on_save(self):
         if self._mgr is None or self._selected_unit is None:
@@ -321,6 +370,43 @@ class UnitPanel(QWidget):
         self._detail_frame.setVisible(False)
         self.units_updated.emit()
         self.refresh_list()
+
+    # ------------------------------------------------------------------
+    # Reverse lookup
+    # ------------------------------------------------------------------
+
+    def _populate_ref_list(self, unit):
+        """Fill the reference list with recipes using this unit."""
+        self._ref_list.clear()
+        names = {unit.name} | set(unit.aliases)
+        recipes = self._find_recipes_using_unit(names)
+        self._ref_label.setText(f"引用菜谱 ({len(recipes)}):")
+        for recipe_name in recipes:
+            item = QListWidgetItem(recipe_name)
+            item.setData(Qt.ItemDataRole.UserRole, f"{recipe_name}.json")
+            self._ref_list.addItem(item)
+
+    def _find_recipes_using_unit(self, names: set[str]) -> list[str]:
+        """Scan all output JSON files for recipes using any of the given unit names."""
+        if self._fm is None:
+            return []
+        recipes: list[str] = []
+        for path in self._fm.list_output_recipes():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                for ing in data.get("ingredients", []):
+                    if ing.get("unit", "") in names:
+                        recipes.append(path.stem)
+                        break
+            except Exception:
+                pass
+        return sorted(recipes)
+
+    def _on_ref_double_clicked(self, item: QListWidgetItem):
+        """Navigate to the referenced recipe."""
+        rel_path = item.data(Qt.ItemDataRole.UserRole)
+        if rel_path:
+            self.navigate_to_recipe.emit(rel_path)
 
 
 class _SplitAliasDialog(QMessageBox):

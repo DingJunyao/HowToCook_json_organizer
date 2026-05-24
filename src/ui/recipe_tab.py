@@ -2,6 +2,7 @@
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -69,12 +70,20 @@ class RecipeTab(QWidget):
         self.source_panel.file_selected.connect(self._on_file_selected)
         self.source_panel.output_file_selected.connect(self._on_output_file_selected)
         self.recipe_form.save_requested.connect(self._on_save)
+        self.recipe_form.dirty_changed.connect(self._on_dirty_changed)
         self.ingredient_panel.ingredient_changed.connect(self._on_ingredients_changed)
+        self.ingredient_panel.navigate_to_recipe.connect(self._on_output_file_selected)
         self.unit_panel.unit_changed.connect(self._on_unit_batch_rename)
         self.unit_panel.units_updated.connect(self._on_units_updated)
+        self.unit_panel.navigate_to_recipe.connect(self._on_output_file_selected)
 
         # Parsed results cache: {relative_path: parsed_dict}
         self._parsed_results: dict = {}
+
+        # Ctrl+S shortcut
+        self._save_shortcut = QShortcut(QKeySequence.Save, self)
+        self._save_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self._save_shortcut.activated.connect(self._on_save_shortcut)
 
     # ------------------------------------------------------------------
     # Public API
@@ -92,8 +101,10 @@ class RecipeTab(QWidget):
         self._sizes_done = True
 
     def set_file_manager(self, fm):
-        """Propagate the FileManager to the source panel."""
+        """Propagate the FileManager to sub-panels."""
         self.source_panel.set_file_manager(fm)
+        self.ingredient_panel.set_file_manager(fm)
+        self.unit_panel.set_file_manager(fm)
 
     def set_ingredient_manager(self, mgr):
         """Propagate the IngredientManager to the ingredient panel and recipe form."""
@@ -137,6 +148,13 @@ class RecipeTab(QWidget):
         if fm is None:
             return
 
+        # Render markdown preview after confirmation
+        try:
+            content = fm.load_markdown(rel_path)
+            self.source_panel.render_markdown(content)
+        except Exception:
+            self.source_panel.preview.setHtml(f"<p>[无法加载文件: {rel_path}]</p>")
+
         self.recipe_form.set_file_source(rel_path, fm)
 
         # Use cached result if available from batch import
@@ -167,6 +185,18 @@ class RecipeTab(QWidget):
         try:
             data = fm.load_recipe(rel_path)
             self.recipe_form.load_recipe(data)
+
+            # Render JSON preview after confirmation
+            try:
+                full_path = fm.output_dir / "out" / rel_path
+                content = full_path.read_text(encoding="utf-8")
+                import json
+                json_data = json.loads(content)
+                self.source_panel.preview.setPlainText(
+                    json.dumps(json_data, ensure_ascii=False, indent=2)
+                )
+            except Exception as e:
+                self.source_panel.preview.setPlainText(f"[无法加载 JSON: {e}]")
 
             # Try to load the corresponding source MD for preview
             source_file = data.get("source_file", "")
@@ -288,6 +318,28 @@ class RecipeTab(QWidget):
         self.recipe_form.set_clean()
 
         print(f"[RecipeTab] 已保存: {recipe_name}")
+
+    def _on_save_shortcut(self):
+        """Handle Ctrl+S: trigger save if the form has content."""
+        if self.recipe_form.is_dirty():
+            self.recipe_form._on_save_clicked()
+        else:
+            status_bar = self.window().statusBar() if self.window() else None
+            if status_bar is not None:
+                status_bar.showMessage("无更改需要保存", 2000)
+
+    def _on_dirty_changed(self, dirty: bool):
+        """Update UI indicators when dirty state changes."""
+        # Update save button text
+        self.recipe_form.save_btn.setText("保存 *" if dirty else "保存")
+
+        # Update tab title
+        tab_widget = self.parent()
+        if isinstance(tab_widget, QTabWidget):
+            index = tab_widget.indexOf(self)
+            if index >= 0:
+                base = "菜谱编辑"
+                tab_widget.setTabText(index, f"{base} *" if dirty else base)
 
     def _on_ingredients_changed(self):
         """Sync ingredient changes: update completer and persist to ingredients.json."""

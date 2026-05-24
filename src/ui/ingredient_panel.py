@@ -1,6 +1,8 @@
 # src/ui/ingredient_panel.py
 from __future__ import annotations
 
+import json
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
@@ -8,6 +10,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QTreeWidget,
@@ -16,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from src.managers.file_manager import FileManager
 from src.managers.ingredient_manager import IngredientManager
 
 CATEGORIES = ["蔬菜", "肉类", "水产", "禽蛋", "豆制品", "主食/谷物", "调料", "饮品", "干货", "其他"]
@@ -25,10 +30,12 @@ class IngredientPanel(QWidget):
     """Right-panel ingredient library reference for RecipeTab."""
 
     ingredient_changed = Signal()  # emitted when ingredients are modified
+    navigate_to_recipe = Signal(str)  # emitted when user double-clicks a recipe reference
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._mgr: IngredientManager | None = None
+        self._fm: FileManager | None = None
         self._selected_ingredient = None  # currently selected Ingredient object
         self._setup_ui()
 
@@ -116,6 +123,15 @@ class IngredientPanel(QWidget):
         btn_row.addWidget(self._merge_btn)
         detail_layout.addLayout(btn_row)
 
+        # Reverse lookup: recipes using this ingredient
+        self._ref_label = QLabel("引用菜谱:")
+        self._ref_label.setStyleSheet("font-weight: bold; margin-top: 6px;")
+        detail_layout.addWidget(self._ref_label)
+        self._ref_list = QListWidget()
+        self._ref_list.setMaximumHeight(120)
+        self._ref_list.itemDoubleClicked.connect(self._on_ref_double_clicked)
+        detail_layout.addWidget(self._ref_list)
+
         layout.addWidget(self._detail_frame)
 
     # ------------------------------------------------------------------
@@ -126,6 +142,10 @@ class IngredientPanel(QWidget):
         """Set the ingredient manager and refresh the list."""
         self._mgr = mgr
         self.refresh_list()
+
+    def set_file_manager(self, fm: FileManager):
+        """Set the file manager for reverse lookup."""
+        self._fm = fm
 
     def refresh_list(self):
         """Reload ingredients from the manager into the tree."""
@@ -215,6 +235,9 @@ class IngredientPanel(QWidget):
         self._alias_edit.blockSignals(False)
         self._category_combo.blockSignals(False)
 
+        # Reverse lookup
+        self._populate_ref_list(ing)
+
     def _on_field_changed(self, *_):
         """Enable save button when any field is modified."""
         self._save_btn.setEnabled(True)
@@ -290,3 +313,40 @@ class IngredientPanel(QWidget):
             self._detail_frame.setVisible(False)
             self.ingredient_changed.emit()
             self.refresh_list()
+
+    # ------------------------------------------------------------------
+    # Reverse lookup
+    # ------------------------------------------------------------------
+
+    def _populate_ref_list(self, ing):
+        """Fill the reference list with recipes using this ingredient."""
+        self._ref_list.clear()
+        names = {ing.name} | set(ing.aliases)
+        recipes = self._find_recipes_using_ingredient(names)
+        self._ref_label.setText(f"引用菜谱 ({len(recipes)}):")
+        for recipe_name in recipes:
+            item = QListWidgetItem(recipe_name)
+            item.setData(Qt.ItemDataRole.UserRole, f"{recipe_name}.json")
+            self._ref_list.addItem(item)
+
+    def _find_recipes_using_ingredient(self, names: set[str]) -> list[str]:
+        """Scan all output JSON files for recipes containing any of the given names."""
+        if self._fm is None:
+            return []
+        recipes: list[str] = []
+        for path in self._fm.list_output_recipes():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                for ing in data.get("ingredients", []):
+                    if ing.get("ingredient_name", "") in names:
+                        recipes.append(path.stem)
+                        break
+            except Exception:
+                pass
+        return sorted(recipes)
+
+    def _on_ref_double_clicked(self, item: QListWidgetItem):
+        """Navigate to the referenced recipe."""
+        rel_path = item.data(Qt.ItemDataRole.UserRole)
+        if rel_path:
+            self.navigate_to_recipe.emit(rel_path)

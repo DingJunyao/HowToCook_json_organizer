@@ -271,21 +271,12 @@ class SourcePanel(QWidget):
         if rel_path is None:
             return  # clicked a category node
 
-        # Load markdown content into preview
-        if self._fm is not None:
-            try:
-                content = self._fm.load_markdown(rel_path)
-                self._render_markdown(content)
-            except Exception:
-                self.preview.setHtml(f"<p>[无法加载文件: {rel_path}]</p>")
-
         # Check if a corresponding JSON already exists in output
         if self._fm is not None:
             file_stem = Path(rel_path).stem
             json_rel = f"{file_stem}.json"
             json_full = self._fm.output_dir / "out" / json_rel
             if json_full.exists():
-                # Emit output signal so the form loads the existing JSON
                 self.output_file_selected.emit(json_rel)
                 return
 
@@ -296,18 +287,5 @@ class SourcePanel(QWidget):
         rel_path = item.data(0, 200)
         if rel_path is None:
             return  # clicked a placeholder node
-
-        # Load JSON content preview
-        if self._fm is not None:
-            try:
-                full_path = self._fm.output_dir / "out" / rel_path
-                content = full_path.read_text(encoding="utf-8")
-                data = json.loads(content)
-                # Pretty-print the JSON
-                self.preview.setPlainText(
-                    json.dumps(data, ensure_ascii=False, indent=2)
-                )
-            except Exception as e:
-                self.preview.setPlainText(f"[无法加载 JSON: {e}]")
 
         self.output_file_selected.emit(rel_path)

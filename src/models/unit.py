@@ -1,31 +1,19 @@
 # src/models/unit.py
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
+
+_DEFAULT_UNITS_PATH = Path(__file__).resolve().parent.parent / "data" / "default_units.json"
 
 
-# Common Chinese cooking units with common aliases
-DEFAULT_UNITS: list[dict] = [
-    {"name": "克", "aliases": ["g", "克"]},
-    {"name": "千克", "aliases": ["kg", "公斤", "千克"]},
-    {"name": "毫克", "aliases": ["mg", "毫克"]},
-    {"name": "毫升", "aliases": ["ml", "mL", "毫升"]},
-    {"name": "升", "aliases": ["L", "升"]},
-    {"name": "个", "aliases": ["只", "颗", "个"]},
-    {"name": "根", "aliases": ["条", "根"]},
-    {"name": "片", "aliases": ["片"]},
-    {"name": "块", "aliases": ["块"]},
-    {"name": "勺", "aliases": ["汤匙", "勺", "大勺"]},
-    {"name": "茶匙", "aliases": ["小勺", "茶匙", "tsp"]},
-    {"name": "适量", "aliases": ["少许", "适量"]},
-    {"name": "瓣", "aliases": ["瓣"]},
-    {"name": "段", "aliases": ["寸", "段"]},
-    {"name": "滴", "aliases": ["滴"]},
-    {"name": "把", "aliases": ["把"]},
-    {"name": "张", "aliases": ["张"]},
-    {"name": "袋", "aliases": ["包", "袋"]},
-    {"name": "杯", "aliases": ["杯"]},
-]
+def load_default_units() -> list[dict]:
+    """Load default cooking units from ``src/data/default_units.json``."""
+    try:
+        return json.loads(_DEFAULT_UNITS_PATH.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
 
 
 @dataclass

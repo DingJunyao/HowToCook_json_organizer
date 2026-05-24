@@ -4,18 +4,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.models.unit import Unit, DEFAULT_UNITS
+from src.models.unit import Unit, load_default_units
 
 
 class UnitManager:
     def __init__(self):
         self._units: dict[str, Unit] = {}  # key -> Unit
         self._name_index: dict[str, str] = {}  # name/alias -> key
-        self._load_defaults()
 
     def _load_defaults(self):
-        """Load default common cooking units."""
-        for entry in DEFAULT_UNITS:
+        """Load default common cooking units from external config."""
+        for entry in load_default_units():
             name = entry["name"]
             key = name.lower().replace(" ", "_")
             aliases = entry.get("aliases", [])

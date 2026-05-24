@@ -62,6 +62,7 @@ class RecipeForm(QWidget):
     """Scrollable form for editing a single recipe."""
 
     save_requested = Signal(dict)  # emitted when user clicks Save
+    dirty_changed = Signal(bool)   # emitted when dirty state changes
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -449,9 +450,21 @@ class RecipeForm(QWidget):
 
     @staticmethod
     def _strip_list_marker(line: str) -> str:
-        """Remove ordered (1. 1、 1) 1.) and unordered (- * •) list markers."""
+        """Remove list markers and Markdown inline formatting, keeping plain text."""
         import re
-        return re.sub(r"^(?:\d+[.、．)\s]\s*|[-*•]\s*)", "", line).strip()
+        # Strip list markers (with optional leading whitespace)
+        text = re.sub(r"^\s*(?:\d+[.、．)\s]\s*|[-*•]\s*)", "", line).strip()
+        # Strip Markdown inline formatting (order matters)
+        text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)          # ![alt](url) → remove
+        text = re.sub(r"\[([^\]]*)\]\(([^)]*)\)", r"\1(\2)", text) # [text](url) → text(url)
+        text = re.sub(r"`{3}.*?`{3}", "", text, flags=re.DOTALL) # ```code block```
+        text = re.sub(r"`([^`]+)`", r"\1", text)                 # `code` → code
+        text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)             # **bold** → bold
+        text = re.sub(r"__(.+?)__", r"\1", text)                 # __bold__ → bold
+        text = re.sub(r"\*(.+?)\*", r"\1", text)                 # *italic* → italic
+        text = re.sub(r"_(.+?)_", r"\1", text)                   # _italic_ → italic
+        text = re.sub(r"~~(.+?)~~", r"\1", text)                 # ~~strike~~ → strike
+        return text.strip()
 
     @staticmethod
     def _get_section(content: str, header: str) -> str:
@@ -492,7 +505,7 @@ class RecipeForm(QWidget):
                 self._add_step_row()
                 row = self.steps_table.rowCount() - 1
                 self.steps_table.setItem(row, 0, QTableWidgetItem(line))
-            self._dirty = True
+            self._set_dirty(True)
         except Exception as e:
             QMessageBox.critical(self, "导入失败", f"无法读取文件: {e}")
 
@@ -520,7 +533,7 @@ class RecipeForm(QWidget):
                 self._add_tip_row()
                 row = self.tips_table.rowCount() - 1
                 self.tips_table.setItem(row, 0, QTableWidgetItem(line))
-            self._dirty = True
+            self._set_dirty(True)
         except Exception as e:
             QMessageBox.critical(self, "导入失败", f"无法读取文件: {e}")
 
@@ -558,7 +571,7 @@ class RecipeForm(QWidget):
                 QMessageBox.information(self, "导入简介", "未找到有效简介内容。")
                 return
             self.description_edit.setPlainText(text)
-            self._dirty = True
+            self._set_dirty(True)
         except Exception as e:
             QMessageBox.critical(self, "导入失败", f"无法读取文件: {e}")
 
@@ -632,7 +645,7 @@ class RecipeForm(QWidget):
             edit.blockSignals(False)
 
     def _on_ingredient_cell_changed(self, row: int, col: int):
-        self._dirty = True
+        self._set_dirty(True)
         # Skip non-text columns: 1 (link, non-editable), 6 (用量描述 combo), 7 (可选 checkbox)
         if col not in (1, 6, 7):
             self._clean_cell(self.ingredients_table, row, col)
@@ -640,15 +653,21 @@ class RecipeForm(QWidget):
             self._update_link_status(row)
 
     def _on_step_cell_changed(self, row: int, col: int):
-        self._dirty = True
+        self._set_dirty(True)
         self._clean_cell(self.steps_table, row, col)
 
     def _on_tip_cell_changed(self, row: int, col: int):
-        self._dirty = True
+        self._set_dirty(True)
         self._clean_cell(self.tips_table, row, col)
 
     def _mark_dirty(self, *_):
-        self._dirty = True
+        self._set_dirty(True)
+
+    def _set_dirty(self, dirty: bool):
+        """Set dirty state and emit signal on change."""
+        if self._dirty != dirty:
+            self._dirty = dirty
+            self.dirty_changed.emit(dirty)
 
     def _move_row(self, table: QTableWidget, direction: int):
         """Move the current row up (direction=-1) or down (direction=+1)."""
@@ -763,7 +782,7 @@ class RecipeForm(QWidget):
 
         table.blockSignals(False)
         table.selectRow(target)
-        self._dirty = True
+        self._set_dirty(True)
 
     def is_dirty(self) -> bool:
         """Return whether the form has unsaved changes."""
@@ -771,7 +790,9 @@ class RecipeForm(QWidget):
 
     def set_clean(self):
         """Mark the form as having no unsaved changes."""
-        self._dirty = False
+        if self._dirty:
+            self._dirty = False
+            self.dirty_changed.emit(False)
 
     def _on_save_clicked(self):
         """Collect form data and emit save_requested."""
@@ -785,7 +806,7 @@ class RecipeForm(QWidget):
     def load_recipe(self, data: dict) -> None:
         """Populate the form from parsed Markdown or existing JSON data."""
         self.clear_form()
-        self._dirty = False  # clear_form triggers change signals; reset after
+        self._set_dirty(False)  # clear_form triggers change signals; reset after
 
         # Basic info
         self.name_edit.setText(data.get("name", ""))
@@ -826,7 +847,7 @@ class RecipeForm(QWidget):
         for tip in tips:
             self._add_tip_row_from(tip)
 
-        self._dirty = False  # reset after all fields are populated
+        self._set_dirty(False)  # reset after all fields are populated
         self._resize_columns_to_content()
 
     def collect_data(self) -> dict:
@@ -876,7 +897,7 @@ class RecipeForm(QWidget):
         self.ingredients_table.setRowCount(0)
         self.steps_table.setRowCount(0)
         self.tips_table.setRowCount(0)
-        self._dirty = False
+        self._set_dirty(False)
 
     def _resize_columns_to_content(self):
         """Set column widths based on content, then switch to interactive for manual drag."""
@@ -965,10 +986,15 @@ class RecipeForm(QWidget):
 
     def _on_qty_desc_changed(self, combo: QComboBox):
         self._mark_dirty()
-        row = combo.property("_ingredient_row")
+        # Always search the table to find the current row — the cached property
+        # can be stale after row deletion or reordering.
+        row = None
+        for r in range(self.ingredients_table.rowCount()):
+            if self.ingredients_table.cellWidget(r, 6) is combo:
+                row = r
+                break
         if row is not None:
             self._update_approx_state(row)
-            return
 
     def _refresh_unit_combos(self):
         """Refresh all unit combo boxes in the ingredient table."""
@@ -980,9 +1006,13 @@ class RecipeForm(QWidget):
                 combo.clear()
                 if self._um:
                     combo.addItems(self._um.get_display_names())
-                idx = combo.findText(current)
-                if idx >= 0:
-                    combo.setCurrentIndex(idx)
+                    # Resolve old value to current primary name via alias index
+                    if current:
+                        unit = self._um.get_by_name(current)
+                        resolved = unit.name if unit else current
+                        idx = combo.findText(resolved)
+                        if idx >= 0:
+                            combo.setCurrentIndex(idx)
                 combo.blockSignals(False)
 
     def batch_rename_unit(self, old_name: str, new_name: str):
@@ -997,7 +1027,7 @@ class RecipeForm(QWidget):
                 else:
                     combo.setEditText(new_name)
                 combo.blockSignals(False)
-        self._dirty = True
+        self._set_dirty(True)
 
     def _update_completer(self):
         """Update the auto-completer with ingredient names and aliases."""

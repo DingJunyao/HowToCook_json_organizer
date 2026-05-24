@@ -116,25 +116,31 @@ class MainWindow(QMainWindow):
         self.recipe_tab.set_ingredient_manager(self._im)
         self.nutrition_tab.set_ingredient_manager(self._im)
 
-        # Unit manager
+        # Unit manager — persisted data takes priority over defaults
         self._um = UnitManager()
-        # Discover units from existing recipe JSON files
+        import json as _json
+
+        units_path = output_dir / "out" / "units.json"
+        loaded_from_file = False
+        if units_path.exists():
+            try:
+                raw_units = _json.loads(units_path.read_text(encoding="utf-8"))
+                if isinstance(raw_units, list) and raw_units:
+                    self._um.load_from_list(raw_units)
+                    loaded_from_file = True
+            except Exception:
+                pass
+
+        if not loaded_from_file:
+            self._um._load_defaults()
+
+        # Discover new units from existing recipe JSON files
         recipe_files = self._fm.list_output_recipes()
         discovered_units = self._um.discover_from_recipes(recipe_files)
         if discovered_units:
             new_count = self._um.add_discovered_units(discovered_units)
             if new_count:
                 print(f"[MainWindow] Discovered {new_count} new unit(s) from recipes: {discovered_units}")
-        # Also load persisted custom units if available
-        units_path = output_dir / "out" / "units.json"
-        if units_path.exists():
-            import json as _json
-            try:
-                raw_units = _json.loads(units_path.read_text(encoding="utf-8"))
-                if isinstance(raw_units, list):
-                    self._um.load_from_list(raw_units)
-            except Exception:
-                pass
         self.recipe_tab.set_unit_manager(self._um)
 
         # Nutrition matcher (loaded from nutritions.json if present)
