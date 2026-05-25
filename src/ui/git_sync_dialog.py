@@ -41,6 +41,7 @@ class SyncWorker(QThread):
         self.repo = GitRepo(repo_dir)
         self._changed_files: list[str] = []
         self._untracked_files: list[str] = []
+        self._last_error: str = ""
 
     def set_files_for_commit(self, changed: list[str], untracked: list[str]) -> None:
         self._changed_files = changed
@@ -63,15 +64,24 @@ class SyncWorker(QThread):
         self.progress.emit("正在检查远程更新...")
         status = self.repo.check_remote_status()
         self.remote_status.emit(status)
+        if status.verbose_output:
+            for line in status.verbose_output.splitlines():
+                self.progress.emit(line)
 
         self.progress.emit("正在检查本地更改...")
         changes = self.repo.check_local_changes()
         self.local_changes_signal.emit(changes)
+        if changes.verbose_output:
+            for line in changes.verbose_output.splitlines():
+                self.progress.emit(line)
 
         self.finished.emit("check_done")
 
     def _do_pull(self) -> None:
         self.progress.emit("正在拉取远程更新...")
+        changes = self.repo.check_local_changes()
+        if changes.has_changes:
+            self.progress.emit("检测到本地更改，正在暂存...")
         success, msg, _had_stash, conflicts = self.repo.pull_with_stash()
         self.progress.emit(msg)
         if conflicts:
@@ -81,20 +91,33 @@ class SyncWorker(QThread):
 
     def _do_commit_push(self) -> None:
         self.progress.emit("正在暂存更改...")
-        self.repo.add_all()
+        add_result = self.repo._run(["add", "-A", "--verbose"], cwd=self.repo.repo_dir, verbose=True)
+        for line in add_result.stdout.strip().splitlines():
+            self.progress.emit(line)
 
-        msg = GitRepo.format_commit_message(self._changed_files, self._untracked_files)
-        self.progress.emit(f"正在提交: {msg}")
-        ok, commit_msg = self.repo.commit(msg)
-        if not ok:
-            self.progress.emit(f"提交: {commit_msg}")
-            self.finished.emit("push_done")
-            return
+        has_staged = bool(self._changed_files) or bool(self._untracked_files)
+        if has_staged:
+            msg = GitRepo.format_commit_message(self._changed_files, self._untracked_files)
+            self.progress.emit(f"正在提交: {msg}")
+            ok, commit_msg = self.repo.commit(msg)
+            self.progress.emit(commit_msg)
+            if not ok:
+                self._last_error = commit_msg
+                self.finished.emit("push_failed")
+                return
+        else:
+            self.progress.emit("无本地更改，跳过提交")
 
         self.progress.emit("正在推送到远程...")
-        ok, push_msg = self.repo.push()
+        ok, push_msg = self.repo.push(
+            progress_callback=lambda line: self.progress.emit(line),
+        )
         self.progress.emit(push_msg)
-        self.finished.emit("push_done")
+        if not ok:
+            self._last_error = push_msg
+            self.finished.emit("push_failed")
+            return
+        self.finished.emit("push_success")
 
 
 class GitSyncDialog(QDialog):
@@ -106,8 +129,12 @@ class GitSyncDialog(QDialog):
         self._local_changes: LocalChanges | None = None
 
         self.setWindowTitle("仓库同步")
-        self.setMinimumSize(560, 420)
-        self.setModal(True)
+        self.setMinimumSize(560, 500)
+        self.setModal(False)
+        # Replace Dialog flag with Window so it appears in the taskbar on Windows
+        flags = self.windowFlags()
+        flags = (flags & ~Qt.WindowType.WindowType_Mask) | Qt.WindowType.Window
+        self.setWindowFlags(flags)
         self._setup_ui()
 
     # ------------------------------------------------------------------
@@ -135,8 +162,8 @@ class GitSyncDialog(QDialog):
 
         self._log = QTextEdit()
         self._log.setReadOnly(True)
-        self._log.setMaximumHeight(120)
-        self._log.setStyleSheet("background-color: #f5f5f5;")
+        self._log.setMinimumHeight(180)
+        self._log.setStyleSheet("background-color: #f5f5f5; font-family: Consolas, 'Courier New', monospace; font-size: 12px;")
         layout.addWidget(self._log)
 
         btn_layout = QHBoxLayout()
@@ -212,6 +239,8 @@ class GitSyncDialog(QDialog):
                 f"远程更新 ({status.behind_count} 个提交)",
                 [f"({status.behind_count} commits behind {status.remote_branch})"],
             )
+        if status.ahead_count > 0:
+            self._log_message(f"本地有 {status.ahead_count} 个未推送的提交")
 
     def _on_local_changes(self, changes: LocalChanges) -> None:
         self._local_changes = changes
@@ -235,16 +264,31 @@ class GitSyncDialog(QDialog):
     def _on_check_finished(self, step: str) -> None:
         self._stop_progress()
 
-        if self._remote_status and self._remote_status.has_updates:
+        has_ahead = self._remote_status and self._remote_status.ahead_count > 0
+        has_behind = self._remote_status and self._remote_status.has_updates
+        has_local = self._local_changes and self._local_changes.has_changes
+
+        if has_behind:
             self._title_label.setText("检测到远程更新")
             self._pull_btn.setVisible(True)
             self._skip_btn.setText("跳过更新")
-        elif self._local_changes and self._local_changes.has_changes:
-            self._title_label.setText("检测到本地更改")
-            self._show_file_list(
-                "未提交的更改",
-                self._local_changes.modified_files + self._local_changes.untracked_files,
-            )
+            # If also have local changes or ahead, show push button after pull
+            if has_local:
+                self._show_file_list(
+                    "未提交的更改",
+                    self._local_changes.modified_files + self._local_changes.untracked_files,
+                )
+            if has_ahead:
+                self._log_message(f"拉取后将推送本地 {self._remote_status.ahead_count} 个提交")
+        elif has_ahead or has_local:
+            if has_local:
+                self._title_label.setText("检测到本地更改")
+                self._show_file_list(
+                    "未提交的更改",
+                    self._local_changes.modified_files + self._local_changes.untracked_files,
+                )
+            else:
+                self._title_label.setText(f"有 {self._remote_status.ahead_count} 个未推送的提交")
             self._push_btn.setVisible(True)
             self._skip_btn.setText("跳过")
         else:
@@ -284,29 +328,45 @@ class GitSyncDialog(QDialog):
         self._stop_progress()
         self._log_message("拉取完成")
 
+        # Re-check local changes after pull
+        has_local = False
         if self._local_changes and self._local_changes.has_changes:
+            has_local = True
+        else:
+            try:
+                changes = self.repo.check_local_changes()
+                if changes.has_changes:
+                    self._local_changes = changes
+                    has_local = True
+            except Exception:
+                pass
+
+        # Re-check ahead count after pull (unpushed commits)
+        has_ahead = False
+        ahead = 0
+        try:
+            local_branch, remote_branch = self.repo.get_branch_info()
+            ahead_result = self.repo._run(
+                ["rev-list", "--count", f"{remote_branch}..{local_branch}"],
+                cwd=self.repo_dir,
+            )
+            ahead = int(ahead_result.stdout.strip())
+            if ahead > 0:
+                has_ahead = True
+        except Exception:
+            pass
+
+        if has_local:
             self._title_label.setText("拉取完成，检测到本地更改")
             self._show_file_list(
                 "未提交的更改",
                 self._local_changes.modified_files + self._local_changes.untracked_files,
             )
             self._push_btn.setVisible(True)
+        elif has_ahead:
+            self._title_label.setText(f"拉取完成，有 {ahead} 个未推送的提交")
+            self._push_btn.setVisible(True)
         else:
-            # Re-check after pull in case new files appeared
-            try:
-                changes = self.repo.check_local_changes()
-                if changes.has_changes:
-                    self._local_changes = changes
-                    self._title_label.setText("拉取完成，检测到本地更改")
-                    self._show_file_list(
-                        "未提交的更改",
-                        changes.modified_files + changes.untracked_files,
-                    )
-                    self._push_btn.setVisible(True)
-                    return
-            except Exception:
-                pass
-
             self._title_label.setText("同步完成")
             QTimer.singleShot(800, self.accept)
 
@@ -330,14 +390,26 @@ class GitSyncDialog(QDialog):
         self._worker = SyncWorker(self.repo_dir, "commit_push")
         self._worker.set_files_for_commit(changed, untracked)
         self._worker.progress.connect(self._log_message)
-        self._worker.error.connect(self._on_error)
+        self._worker.error.connect(self._on_push_error)
         self._worker.finished.connect(self._on_push_finished)
         self._worker.start()
 
+    def _on_push_error(self, error: GitError) -> None:
+        self._log_message(f"推送错误: {error}")
+        self._title_label.setText("推送失败")
+        self._stop_progress()
+        self._skip_btn.setVisible(True)
+
     def _on_push_finished(self, step: str) -> None:
         self._stop_progress()
-        self._title_label.setText("同步完成")
-        QTimer.singleShot(800, self.accept)
+        if step == "push_success":
+            self._title_label.setText("同步完成")
+            QTimer.singleShot(800, self.accept)
+        else:
+            error_msg = self._worker._last_error if self._worker else "未知错误"
+            self._log_message(f"推送错误: {error_msg}")
+            self._title_label.setText("推送失败")
+            self._skip_btn.setVisible(True)
 
     def _on_conflict_resolve(self) -> None:
         self._conflict_resolve_btn.setVisible(False)

@@ -343,7 +343,9 @@ class _ManualSyncWorker(QThread):
                     self.progress.emit(f"提交: {result}")
                 else:
                     self.progress.emit("正在推送到远程...")
-                    ok, push_msg = self.repo.push()
+                    ok, push_msg = self.repo.push(
+                        progress_callback=lambda line: self.progress.emit(line),
+                    )
                     self.progress.emit(push_msg)
             else:
                 self.progress.emit("无本地更改，无需提交")

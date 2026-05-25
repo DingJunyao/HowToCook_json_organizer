@@ -166,8 +166,11 @@ class RecipeForm(QWidget):
         vbox = QVBoxLayout(self._images_group)
 
         btn_row = QHBoxLayout()
+        self.import_images_btn = QPushButton("快速导入")
+        self.import_images_btn.setToolTip("从 MD 文件中提取图片链接并导入")
         self.add_image_btn = QPushButton("添加图片")
         self.remove_image_btn = QPushButton("删除选中")
+        btn_row.addWidget(self.import_images_btn)
         btn_row.addWidget(self.add_image_btn)
         btn_row.addWidget(self.remove_image_btn)
         btn_row.addStretch()
@@ -193,6 +196,7 @@ class RecipeForm(QWidget):
 
         self.add_image_btn.clicked.connect(self._add_image_row)
         self.remove_image_btn.clicked.connect(self._remove_image_row)
+        self.import_images_btn.clicked.connect(self._import_images_from_file)
 
     # --- Description ---------------------------------------------------------
 
@@ -574,6 +578,64 @@ class RecipeForm(QWidget):
             self._set_dirty(True)
         except Exception as e:
             QMessageBox.critical(self, "导入失败", f"无法读取文件: {e}")
+
+    def _import_images_from_file(self):
+        """从 MD 文件中提取图片链接并导入到 out/images。
+
+        1. 提取 MD 中所有图片链接
+        2. 清理现有图片记录（文件不存在则删除）
+        3. 对比文件 hash，复用已存在的图片或复制新图片
+        4. 智能合并：保留有效现有图片，新图片追加到末尾
+        """
+        from src.managers.image_manager import ImageManager
+
+        if not self._source_path or not self._fm:
+            QMessageBox.warning(self, "快速导入", "请先选择一个源 MD 文件。")
+            return
+        try:
+            content = self._fm.load_markdown(self._source_path)
+            image_urls = ImageManager.extract_image_urls(content)
+            if not image_urls:
+                QMessageBox.information(self, "导入图片", "MD 文件中未找到图片链接。")
+                return
+
+            recipe_name = self.name_edit.text().strip()
+            if not recipe_name:
+                QMessageBox.warning(self, "导入图片", "请先输入菜谱名称。")
+                return
+
+            existing_images = self._collect_images()
+
+            im = ImageManager()
+            final_images, new_images = im.import_images(
+                recipe_name=recipe_name,
+                md_image_urls=image_urls,
+                md_source_path=self._source_path,
+                source_dir=self._fm.source_dir,
+                output_dir=self._fm.output_dir,
+                existing_images=existing_images,
+            )
+
+            # Clear and repopulate the images table
+            self.images_table.setRowCount(0)
+            for url in final_images:
+                self._add_image_row(url)
+
+            if new_images:
+                QMessageBox.information(
+                    self, "导入图片",
+                    f"成功导入 {len(new_images)} 张图片。\n"
+                    f"总计: {len(final_images)} 张。"
+                )
+            else:
+                QMessageBox.information(
+                    self, "导入图片",
+                    f"所有图片已存在，未新增图片。\n"
+                    f"总计: {len(final_images)} 张。"
+                )
+            self._set_dirty(True)
+        except Exception as e:
+            QMessageBox.critical(self, "导入失败", f"无法导入图片: {e}")
 
     # --- Bottom buttons ---------------------------------------------------
 

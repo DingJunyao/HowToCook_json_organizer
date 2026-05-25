@@ -75,3 +75,7 @@ class FileManager:
             "matched_ingredients.json",
         }
         return sorted(p for p in out_dir.glob("*.json") if p.name not in skip)
+
+    def get_images_dir(self) -> Path:
+        """返回 out/images 目录路径（不保证存在）。"""
+        return self.output_dir / "out" / "images"
