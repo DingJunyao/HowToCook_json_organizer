@@ -68,7 +68,7 @@ class GitRepo:
             raise GitError(GitErrorType.NO_GIT, "git 未找到", "请安装 git 并确保其在 PATH 中。")
 
         cmd = [git_exe] + args
-        env = {"GIT_TERMINAL_PROMPT": "0"}
+        env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
 
         if progress_callback is not None:
             return GitRepo._run_streaming(cmd, cwd, timeout, env, progress_callback)
@@ -81,7 +81,7 @@ class GitRepo:
                 text=True,
                 timeout=timeout,
                 encoding="utf-8",
-                env={**os.environ, **env},
+                env=env,
             )
         except subprocess.TimeoutExpired:
             raise GitError(

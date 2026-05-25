@@ -406,8 +406,6 @@ class GitSyncDialog(QDialog):
             self._title_label.setText("同步完成")
             QTimer.singleShot(800, self.accept)
         else:
-            error_msg = self._worker._last_error if self._worker else "未知错误"
-            self._log_message(f"推送错误: {error_msg}")
             self._title_label.setText("推送失败")
             self._skip_btn.setVisible(True)
 
