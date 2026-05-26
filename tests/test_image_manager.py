@@ -67,6 +67,38 @@ def test_extract_image_urls_empty():
     assert ImageManager.extract_image_urls("# 菜谱\n\n没有图片。") == []
 
 
+def test_extract_image_urls_parens_in_filename():
+    """文件名中含有括号应正确提取完整路径。"""
+    md = "![血浆鸭(特辣)](./血浆鸭(特辣).jpg)"
+    urls = ImageManager.extract_image_urls(md)
+    assert len(urls) == 1
+    assert urls[0] == "./血浆鸭(特辣).jpg"
+
+
+def test_extract_image_urls_url_with_params():
+    """带查询参数的 URL 应完整提取。"""
+    md = "![logo](https://example.com/img.jpg?w=800&h=600)"
+    urls = ImageManager.extract_image_urls(md)
+    assert len(urls) == 1
+    assert urls[0] == "https://example.com/img.jpg?w=800&h=600"
+
+
+def test_extract_image_urls_inline_then_text():
+    """行内图片后跟其他内容不会被吞掉。"""
+    md = "![alt](image.jpg) 后面有文字 (note)"
+    urls = ImageManager.extract_image_urls(md)
+    assert len(urls) == 1
+    assert urls[0] == "image.jpg"
+
+
+def test_extract_image_urls_url_with_fragment():
+    """带 #fragment 的 URL 应完整提取。"""
+    md = "![chart](https://example.com/chart.png?v=1#section)"
+    urls = ImageManager.extract_image_urls(md)
+    assert len(urls) == 1
+    assert urls[0] == "https://example.com/chart.png?v=1#section"
+
+
 # ---------------------------------------------------------------------------
 # 2. compute_hash
 # ---------------------------------------------------------------------------

@@ -179,8 +179,51 @@ class ImageManager:
 
         return cleaned, new_images
 
+    # 常见图片扩展名，锚定 extract_image_urls 的匹配边界
+    _IMAGE_EXT_PATTERN = r"(?:png|PNG|jpg|JPG|jpeg|JPEG|gif|GIF|webp|WEBP|bmp|BMP|svg|SVG|ico|ICO|tiff|TIFF|tif|TIF)"
+
     @staticmethod
     def extract_image_urls(markdown_content: str) -> list[str]:
-        """从 Markdown 内容中提取所有图片链接。"""
-        pattern = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
-        return pattern.findall(markdown_content)
+        """从 Markdown 内容中提取所有图片链接。
+
+        使用括号计数扫描而非纯正则，支持文件名中含括号的路径（如 ./血浆鸭(特辣).jpg）
+        以及带查询参数的 URL（如 https://example.com/img.jpg?w=800），
+        同时不会贪婪吞掉行内后续内容。
+        """
+        urls: list[str] = []
+        pos = 0
+        content_len = len(markdown_content)
+
+        while pos < content_len:
+            # Find ![
+            bang_br = markdown_content.find("![", pos)
+            if bang_br == -1:
+                break
+            # Find ]( after ![
+            alt_end = markdown_content.find("](", bang_br + 2)
+            if alt_end == -1:
+                pos = bang_br + 2
+                continue
+
+            # Scan for balanced parentheses after ](
+            url_start = alt_end + 2
+            depth = 1
+            scan = url_start
+            while scan < content_len and depth > 0:
+                ch = markdown_content[scan]
+                if ch == "(":
+                    depth += 1
+                elif ch == ")":
+                    depth -= 1
+                scan += 1
+
+            if depth == 0:
+                # scan points one past the matching )
+                url = markdown_content[url_start:scan - 1]
+                urls.append(url)
+                pos = scan
+            else:
+                # Unmatched, skip this
+                pos = url_start
+
+        return urls
