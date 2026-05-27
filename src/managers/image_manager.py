@@ -2,10 +2,15 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 import shutil
+import tempfile
+import urllib.request
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 class ImageManager:
@@ -24,13 +29,13 @@ class ImageManager:
     def resolve_image_path(md_image_url: str, md_source_path: str, source_dir: Path) -> Optional[Path]:
         """将 MD 中的图片 URL/路径解析为实际文件系统路径。
 
-        - 如果 URL 是网络地址 (http/https)，返回 None（不处理远程图片）。
+        - 如果 URL 是网络地址 (http/https)，下载到临时文件并返回路径。
         - 以 / 开头: 相对于 source_dir 的绝对路径。
         - 其他: 相对于 MD 文件所在目录的相对路径（需先拼接到 source_dir 下）。
-        文件不存在时返回 None。
+        文件不存在/下载失败时返回 None。
         """
         if md_image_url.startswith(("http://", "https://")):
-            return None
+            return ImageManager._download_remote_image(md_image_url)
 
         if md_image_url.startswith("/"):
             base = source_dir
@@ -45,6 +50,21 @@ class ImageManager:
         if candidate.is_file():
             return candidate
         return None
+
+    @staticmethod
+    def _download_remote_image(url: str) -> Optional[Path]:
+        """下载远程图片到临时文件，返回临时文件路径。失败返回 None。"""
+        try:
+            # 从 URL 中提取文件扩展名
+            ext = Path(url.split("?")[0]).suffix or ".jpg"
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    shutil.copyfileobj(resp, tmp)
+                return Path(tmp.name)
+        except Exception as e:
+            logger.warning("下载远程图片失败 %s: %s", url, e)
+            return None
 
     @staticmethod
     def compute_hash(file_path: Path) -> str:

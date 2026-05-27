@@ -151,8 +151,12 @@ def test_resolve_absolute_path(tmp_env):
 
 
 def test_resolve_http_url():
-    result = ImageManager.resolve_image_path("https://example.com/img.jpg", "test.md", Path("/tmp"))
-    assert result is None
+    """远程 URL 应尝试下载，下载失败时返回 None。"""
+    with pytest.MonkeyPatch.context() as mp:
+        # 模拟下载失败
+        mp.setattr(ImageManager, "_download_remote_image", staticmethod(lambda url: None))
+        result = ImageManager.resolve_image_path("https://example.com/img.jpg", "test.md", Path("/tmp"))
+        assert result is None
 
 
 def test_resolve_nonexistent_file(tmp_env):
@@ -312,21 +316,23 @@ def test_import_images_dedup_same_content(tmp_env):
 
 
 def test_import_images_skips_http(tmp_env):
-    """HTTP URLs should be skipped."""
+    """HTTP URLs 下载失败时应跳过。"""
     source, output, md_path, img1, img2 = tmp_env
     im = ImageManager()
 
-    final_images, new_images = im.import_images(
-        recipe_name="水煮鱼",
-        md_image_urls=["https://example.com/remote.jpg", "images/step1.jpg"],
-        md_source_path=str(md_path),
-        source_dir=source,
-        output_dir=output,
-        existing_images=[],
-    )
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(ImageManager, "_download_remote_image", staticmethod(lambda url: None))
+        final_images, new_images = im.import_images(
+            recipe_name="水煮鱼",
+            md_image_urls=["https://example.com/remote.jpg", "images/step1.jpg"],
+            md_source_path=str(md_path),
+            source_dir=source,
+            output_dir=output,
+            existing_images=[],
+        )
 
-    assert len(final_images) == 1
-    assert len(new_images) == 1
+        assert len(final_images) == 1
+        assert len(new_images) == 1
 
 
 def test_import_images_next_index_increment(tmp_env):
