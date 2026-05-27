@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -153,6 +154,11 @@ class IngredientPanel(QWidget):
         if self._mgr is None:
             return
 
+        # Compute usage counts for color coding
+        ingredient_counts: dict[str, int] = {}
+        if self._fm:
+            ingredient_counts, _ = self._fm.compute_usage_counts()
+
         query = self._search_edit.text().strip().lower()
         ingredients = self._mgr.search(query) if query else self._mgr.get_all()
 
@@ -171,8 +177,16 @@ class IngredientPanel(QWidget):
 
             for ing in sorted(items, key=lambda i: i.name):
                 match_icon = "✓" if ing.usda_match_status == "matched" else "○"
-                child = QTreeWidgetItem(cat_item, [f"{ing.name}  {match_icon}"])
+                # Count usage across all matching names
+                names = {ing.name} | set(ing.aliases)
+                usage = sum(ingredient_counts.get(n, 0) for n in names)
+                text = f"{ing.name}  {match_icon}  [{usage}]"
+                child = QTreeWidgetItem(cat_item, [text])
                 child.setData(0, Qt.ItemDataRole.UserRole, ing)
+                if usage == 0:
+                    child.setForeground(0, QColor("#CC0000"))
+                elif usage <= 2:
+                    child.setForeground(0, QColor("#CC8800"))
 
         self._detail_frame.setVisible(False)
         self._selected_ingredient = None

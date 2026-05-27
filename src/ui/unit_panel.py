@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -169,6 +170,11 @@ class UnitPanel(QWidget):
         if self._mgr is None:
             return
 
+        # Compute usage counts for color coding
+        unit_counts: dict[str, int] = {}
+        if self._fm:
+            _, unit_counts = self._fm.compute_usage_counts()
+
         query = self._search_edit.text().strip().lower()
         units = self._mgr.get_all()
         if query:
@@ -177,8 +183,15 @@ class UnitPanel(QWidget):
 
         for unit in sorted(units, key=lambda u: u.name):
             aliases_text = f" ({', '.join(unit.aliases)})" if unit.aliases else ""
-            item = QTreeWidgetItem(self._tree, [f"{unit.name}{aliases_text}"])
+            # Count usage across all matching names
+            names = {unit.name} | set(unit.aliases)
+            usage = sum(unit_counts.get(n, 0) for n in names)
+            item = QTreeWidgetItem(self._tree, [f"{unit.name}{aliases_text}  [{usage}]"])
             item.setData(0, Qt.ItemDataRole.UserRole, unit)
+            if usage == 0:
+                item.setForeground(0, QColor("#CC0000"))
+            elif usage <= 2:
+                item.setForeground(0, QColor("#CC8800"))
 
         self._detail_frame.setVisible(False)
         self._selected_unit = None
@@ -376,31 +389,32 @@ class UnitPanel(QWidget):
     # ------------------------------------------------------------------
 
     def _populate_ref_list(self, unit):
-        """Fill the reference list with recipes using this unit."""
+        """Fill the reference list with recipes using this unit, showing per-recipe usage count."""
         self._ref_list.clear()
         names = {unit.name} | set(unit.aliases)
         recipes = self._find_recipes_using_unit(names)
-        self._ref_label.setText(f"引用菜谱 ({len(recipes)}):")
-        for recipe_name in recipes:
-            item = QListWidgetItem(recipe_name)
+        total_usage = sum(recipes.values())
+        self._ref_label.setText(f"引用菜谱 ({len(recipes)} 个, 共 {total_usage} 次):")
+        for recipe_name, count in sorted(recipes.items()):
+            item = QListWidgetItem(f"{recipe_name}  ({count}次)")
             item.setData(Qt.ItemDataRole.UserRole, f"{recipe_name}.json")
             self._ref_list.addItem(item)
 
-    def _find_recipes_using_unit(self, names: set[str]) -> list[str]:
-        """Scan all output JSON files for recipes using any of the given unit names."""
+    def _find_recipes_using_unit(self, names: set[str]) -> dict[str, int]:
+        """Scan all output JSON files, returning {recipe_name: usage_count} for matching units."""
         if self._fm is None:
-            return []
-        recipes: list[str] = []
+            return {}
+        recipes: dict[str, int] = {}
         for path in self._fm.list_output_recipes():
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-                for ing in data.get("ingredients", []):
-                    if ing.get("unit", "") in names:
-                        recipes.append(path.stem)
-                        break
+                count = sum(1 for ing in data.get("ingredients", [])
+                           if ing.get("unit", "") in names)
+                if count > 0:
+                    recipes[path.stem] = count
             except Exception:
                 pass
-        return sorted(recipes)
+        return recipes
 
     def _on_ref_double_clicked(self, item: QListWidgetItem):
         """Navigate to the referenced recipe."""

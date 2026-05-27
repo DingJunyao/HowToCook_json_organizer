@@ -257,8 +257,11 @@ class RecipeForm(QWidget):
         self.ingredient_down_btn = QPushButton("▼")
         self.ingredient_down_btn.setFixedWidth(30)
         self.ingredient_down_btn.setToolTip("下移")
+        self.clear_ingredient_qty_btn = QPushButton("清空用量")
+        self.clear_ingredient_qty_btn.setToolTip("清空所有食材的数量、范围和备注")
         btn_row.addWidget(self.add_ingredient_btn)
         btn_row.addWidget(self.remove_ingredient_btn)
+        btn_row.addWidget(self.clear_ingredient_qty_btn)
         btn_row.addStretch()
         btn_row.addWidget(self.ingredient_up_btn)
         btn_row.addWidget(self.ingredient_down_btn)
@@ -289,6 +292,7 @@ class RecipeForm(QWidget):
         # Connect buttons
         self.add_ingredient_btn.clicked.connect(self._add_ingredient_row)
         self.remove_ingredient_btn.clicked.connect(self._remove_ingredient_row)
+        self.clear_ingredient_qty_btn.clicked.connect(self._clear_ingredient_quantities)
         self.ingredient_up_btn.clicked.connect(lambda: self._move_row(self.ingredients_table, -1))
         self.ingredient_down_btn.clicked.connect(lambda: self._move_row(self.ingredients_table, 1))
 
@@ -297,8 +301,8 @@ class RecipeForm(QWidget):
         self.ingredients_table.insertRow(row)
         # 数量 (col 2)
         self.ingredients_table.setItem(row, 2, QTableWidgetItem(""))
-        # Unit combo box (col 3)
-        self.ingredients_table.setCellWidget(row, 3, self._create_unit_combo())
+        # Unit combo box (col 3) — default to g/克
+        self.ingredients_table.setCellWidget(row, 3, self._create_unit_combo("g"))
         # 范围(最小) (col 4)
         self.ingredients_table.setItem(row, 4, QTableWidgetItem(""))
         # 范围(最大) (col 5)
@@ -319,6 +323,23 @@ class RecipeForm(QWidget):
         )
         for r in rows:
             self.ingredients_table.removeRow(r)
+
+    def _clear_ingredient_quantities(self):
+        """清空所有食材的数量、范围、用量描述和备注。"""
+        for row in range(self.ingredients_table.rowCount()):
+            for col in (2, 4, 5, 8):
+                item = self.ingredients_table.item(row, col)
+                if item:
+                    self.ingredients_table.blockSignals(True)
+                    item.setText("")
+                    self.ingredients_table.blockSignals(False)
+            # 重置用量描述为精确（空选项）
+            combo = self.ingredients_table.cellWidget(row, 6)
+            if isinstance(combo, QComboBox):
+                combo.blockSignals(True)
+                combo.setCurrentIndex(0)
+                combo.blockSignals(False)
+        self._set_dirty(True)
 
     # --- Steps ------------------------------------------------------------
 
@@ -405,9 +426,12 @@ class RecipeForm(QWidget):
         self.tip_down_btn = QPushButton("▼")
         self.tip_down_btn.setFixedWidth(30)
         self.tip_down_btn.setToolTip("下移")
+        self.clear_all_tips_btn = QPushButton("清空全部")
+        self.clear_all_tips_btn.setToolTip("一键清空所有小贴士")
         btn_row.addWidget(self.add_tip_btn)
         btn_row.addWidget(self.remove_tip_btn)
         btn_row.addWidget(self.import_tips_btn)
+        btn_row.addWidget(self.clear_all_tips_btn)
         btn_row.addStretch()
         btn_row.addWidget(self.tip_up_btn)
         btn_row.addWidget(self.tip_down_btn)
@@ -435,6 +459,7 @@ class RecipeForm(QWidget):
         self.add_tip_btn.clicked.connect(self._add_tip_row)
         self.remove_tip_btn.clicked.connect(self._remove_tip_row)
         self.import_tips_btn.clicked.connect(self._import_tips_from_file)
+        self.clear_all_tips_btn.clicked.connect(self._clear_all_tips)
         self.tip_up_btn.clicked.connect(lambda: self._move_row(self.tips_table, -1))
         self.tip_down_btn.clicked.connect(lambda: self._move_row(self.tips_table, 1))
 
@@ -449,6 +474,11 @@ class RecipeForm(QWidget):
         )
         for r in rows:
             self.tips_table.removeRow(r)
+
+    def _clear_all_tips(self):
+        """一键清空所有小贴士。"""
+        self.tips_table.setRowCount(0)
+        self._set_dirty(True)
 
     # --- Quick Import from file ---------------------------------------------
 
@@ -1026,7 +1056,12 @@ class RecipeForm(QWidget):
         if self._um:
             combo.addItems(self._um.get_display_names())
         if selected:
-            idx = combo.findText(selected)
+            name = selected
+            if self._um:
+                unit = self._um.get_by_name(selected)
+                if unit:
+                    name = unit.name
+            idx = combo.findText(name)
             if idx >= 0:
                 combo.setCurrentIndex(idx)
         combo.currentIndexChanged.connect(self._mark_dirty)

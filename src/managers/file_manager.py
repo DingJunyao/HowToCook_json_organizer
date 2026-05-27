@@ -9,8 +9,34 @@ class FileManager:
     def __init__(self, source_dir: Path, output_dir: Path):
         self.source_dir = Path(source_dir)
         self.output_dir = Path(output_dir)
+        self._usage_cache: tuple[dict[str, int], dict[str, int]] | None = None
+
+    def compute_usage_counts(self) -> tuple[dict[str, int], dict[str, int]]:
+        """扫描所有菜谱 JSON，返回 (食材名→使用次数, 单位名→使用次数)。"""
+        if self._usage_cache is not None:
+            return self._usage_cache
+        ingredient_counts: dict[str, int] = {}
+        unit_counts: dict[str, int] = {}
+        for path in self.list_output_recipes():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                for ing in data.get("ingredients", []):
+                    name = ing.get("ingredient_name", "")
+                    if name:
+                        ingredient_counts[name] = ingredient_counts.get(name, 0) + 1
+                    unit = ing.get("unit", "")
+                    if unit:
+                        unit_counts[unit] = unit_counts.get(unit, 0) + 1
+            except Exception:
+                pass
+        self._usage_cache = (ingredient_counts, unit_counts)
+        return self._usage_cache
+
+    def invalidate_usage_cache(self) -> None:
+        self._usage_cache = None
 
     def save_recipe(self, relative_path: str, data: dict) -> None:
+        self.invalidate_usage_cache()
         path = self.output_dir / "out" / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
         # If the file already exists, merge to preserve field order
