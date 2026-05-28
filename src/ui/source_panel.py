@@ -15,7 +15,35 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem,
     QTextBrowser,
     QPushButton,
+    QApplication,
 )
+
+_STRIP_CHARS = "\n\r"
+
+
+class CleanCopyTextBrowser(QTextBrowser):
+    """QTextBrowser that strips stray newlines added by Qt from block
+    separators when copying text to the clipboard."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._cleaning = False
+        QApplication.clipboard().dataChanged.connect(self._on_clipboard_changed)
+
+    def _on_clipboard_changed(self):
+        if self._cleaning:
+            return
+        # Only clean when this widget (or its child) has focus
+        fw = QApplication.focusWidget()
+        if fw is not None and fw is not self and not self.isAncestorOf(fw):
+            return
+        self._cleaning = True
+        clipboard = QApplication.clipboard()
+        text = clipboard.text()
+        cleaned = text.strip(_STRIP_CHARS)
+        if cleaned != text:
+            clipboard.setText(cleaned)
+        self._cleaning = False
 
 
 CATEGORY_MAP = {
@@ -81,7 +109,7 @@ class SourcePanel(QWidget):
         splitter.addWidget(self.tree)
 
         # --- preview ---
-        self.preview = QTextBrowser()
+        self.preview = CleanCopyTextBrowser()
         self.preview.setPlaceholderText("双击左侧文件以预览 Markdown 内容")
         splitter.addWidget(self.preview)
 
@@ -142,16 +170,19 @@ class SourcePanel(QWidget):
         text = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', image_placeholder, text)
 
         html = markdown.markdown(text, extensions=["tables", "fenced_code"])
-        styled = f"""
-        <html><head><style>
-        body {{ font-family: "Microsoft YaHei", "Segoe UI", sans-serif; font-size: 14px;
-               padding: 8px; line-height: 1.6; }}
-        h1 {{ color: #2c3e50; border-bottom: 1px solid #ddd; padding-bottom: 4px; }}
-        h2 {{ color: #34495e; margin-top: 16px; }}
-        ul {{ padding-left: 20px; }}
-        li {{ margin: 2px 0; }}
-        </style></head><body>{html}</body></html>
-        """
+        # Collapse whitespace between block-level tags so QTextBrowser does not
+        # preserve stray newlines as text nodes (which leak into the clipboard).
+        html = re.sub(r'>\s*\n\s*<', '><', html)
+        styled = (
+            '<html><head><style>'
+            'body { font-family: "Microsoft YaHei", "Segoe UI", sans-serif;'
+            ' font-size: 14px; padding: 8px; line-height: 1.6; }'
+            'h1 { color: #2c3e50; border-bottom: 1px solid #ddd; padding-bottom: 4px; }'
+            'h2 { color: #34495e; margin-top: 16px; }'
+            'ul { padding-left: 20px; }'
+            'li { margin: 2px 0; }'
+            f'</style></head><body>{html}</body></html>'
+        )
         self.preview.setHtml(styled)
 
     def refresh_tree(self):

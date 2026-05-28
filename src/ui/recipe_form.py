@@ -714,8 +714,18 @@ class RecipeForm(QWidget):
 
     @staticmethod
     def _strip_invisible(text: str) -> str:
-        """Remove invisible characters and whitespace from both ends."""
-        return text.strip("﻿​‌‍⁠      　 ").strip()
+        """Remove invisible/control/format characters and whitespace from both ends."""
+        import unicodedata
+        def _is_removable(ch: str) -> bool:
+            cat = unicodedata.category(ch)
+            return cat in ("Cc", "Cf", "Zs", "Zl", "Zp")
+        start = 0
+        while start < len(text) and _is_removable(text[start]):
+            start += 1
+        end = len(text)
+        while end > start and _is_removable(text[end - 1]):
+            end -= 1
+        return text[start:end]
 
     def _clean_cell(self, table: QTableWidget, row: int, col: int):
         """Clean invisible chars from a table cell."""
@@ -957,7 +967,7 @@ class RecipeForm(QWidget):
         tips = []
         for row in range(self.tips_table.rowCount()):
             item = self.tips_table.item(row, 0)
-            text = item.text().strip() if item else ""
+            text = self._strip_invisible(item.text()) if item else ""
             if text:
                 tips.append(text)
 
@@ -1330,7 +1340,7 @@ class RecipeForm(QWidget):
     def _collect_ingredient_row(self, row: int) -> dict:
         def _text(col: int) -> str:
             item = self.ingredients_table.item(row, col)
-            return item.text().strip() if item else ""
+            return self._strip_invisible(item.text()) if item else ""
 
         name = _text(0)
         qty_str = _text(2)
@@ -1389,7 +1399,7 @@ class RecipeForm(QWidget):
     def _collect_step_row(self, row: int) -> dict:
         def _text(col: int) -> str:
             item = self.steps_table.item(row, col)
-            return item.text().strip() if item else ""
+            return self._strip_invisible(item.text()) if item else ""
 
         duration = None
         dur_str = _text(1)
