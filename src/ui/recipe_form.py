@@ -170,10 +170,18 @@ class RecipeForm(QWidget):
         self.import_images_btn.setToolTip("从 MD 文件中提取图片链接并导入")
         self.add_image_btn = QPushButton("添加图片")
         self.remove_image_btn = QPushButton("删除选中")
+        self.image_up_btn = QPushButton("▲")
+        self.image_up_btn.setFixedWidth(30)
+        self.image_up_btn.setToolTip("上移")
+        self.image_down_btn = QPushButton("▼")
+        self.image_down_btn.setFixedWidth(30)
+        self.image_down_btn.setToolTip("下移")
         btn_row.addWidget(self.import_images_btn)
         btn_row.addWidget(self.add_image_btn)
         btn_row.addWidget(self.remove_image_btn)
         btn_row.addStretch()
+        btn_row.addWidget(self.image_up_btn)
+        btn_row.addWidget(self.image_down_btn)
         vbox.addLayout(btn_row)
 
         self.images_table = QTableWidget(0, len(self.IMAGE_COLUMNS))
@@ -197,6 +205,8 @@ class RecipeForm(QWidget):
         self.add_image_btn.clicked.connect(self._add_image_row)
         self.remove_image_btn.clicked.connect(self._remove_image_row)
         self.import_images_btn.clicked.connect(self._import_images_from_file)
+        self.image_up_btn.clicked.connect(lambda: self._move_image_row(-1))
+        self.image_down_btn.clicked.connect(lambda: self._move_image_row(1))
 
     # --- Description ---------------------------------------------------------
 
@@ -230,6 +240,22 @@ class RecipeForm(QWidget):
         )
         for r in rows:
             self.images_table.removeRow(r)
+
+    def _move_image_row(self, direction: int):
+        """Move the current image row up (direction=-1) or down (direction=+1)."""
+        row = self.images_table.currentRow()
+        if row < 0:
+            return
+        target = row + direction
+        if target < 0 or target >= self.images_table.rowCount():
+            return
+        # Swap items in column 0
+        src_item = self.images_table.takeItem(row, 0)
+        dst_item = self.images_table.takeItem(target, 0)
+        self.images_table.setItem(row, 0, dst_item)
+        self.images_table.setItem(target, 0, src_item)
+        self.images_table.selectRow(target)
+        self._set_dirty(True)
 
     def _collect_images(self) -> list[str]:
         urls = []
