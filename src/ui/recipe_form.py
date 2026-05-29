@@ -1136,6 +1136,14 @@ class RecipeForm(QWidget):
                 combo.blockSignals(False)
         self._set_dirty(True)
 
+    def batch_rename_ingredient(self, old_name: str, new_name: str):
+        """Replace ingredient name across all ingredient rows."""
+        for row in range(self.ingredients_table.rowCount()):
+            name_item = self.ingredients_table.item(row, 0)
+            if name_item is not None and name_item.text() == old_name:
+                name_item.setText(new_name)
+        self._set_dirty(True)
+
     def _update_completer(self):
         """Update the auto-completer with ingredient names and aliases."""
         if self._im is None:

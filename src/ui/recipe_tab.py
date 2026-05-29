@@ -72,6 +72,7 @@ class RecipeTab(QWidget):
         self.recipe_form.save_requested.connect(self._on_save)
         self.recipe_form.dirty_changed.connect(self._on_dirty_changed)
         self.ingredient_panel.ingredient_changed.connect(self._on_ingredients_changed)
+        self.ingredient_panel.ingredient_renamed.connect(self._on_ingredient_batch_rename)
         self.ingredient_panel.navigate_to_recipe.connect(self._on_output_file_selected)
         self.unit_panel.unit_changed.connect(self._on_unit_batch_rename)
         self.unit_panel.units_updated.connect(self._on_units_updated)
@@ -359,6 +360,18 @@ class RecipeTab(QWidget):
                 fm.save_ingredients(ingredients_data)
             except Exception as e:
                 print(f"[RecipeTab] Warning: could not save ingredients.json: {e}")
+
+    def _on_ingredient_batch_rename(self, old_name: str, new_name: str):
+        """Apply ingredient rename to current recipe form and all recipe JSON files."""
+        self.recipe_form.batch_rename_ingredient(old_name, new_name)
+        # Update all recipe JSON files on disk
+        fm = self.source_panel._fm
+        if fm is not None and self._im is not None:
+            recipe_files = [fm.output_dir / "out" / p.name for p in fm.list_output_recipes()]
+            modified = self._im.update_all_recipes(recipe_files, {old_name: new_name})
+            if modified:
+                fm.invalidate_usage_cache()
+                print(f"[RecipeTab] Renamed ingredient '{old_name}' -> '{new_name}' in {modified} recipe file(s)")
 
     def _on_unit_batch_rename(self, old_name: str, new_name: str):
         """Apply unit rename to current recipe form and all recipe JSON files.

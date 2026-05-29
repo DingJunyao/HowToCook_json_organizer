@@ -31,6 +31,7 @@ class IngredientPanel(QWidget):
     """Right-panel ingredient library reference for RecipeTab."""
 
     ingredient_changed = Signal()  # emitted when ingredients are modified
+    ingredient_renamed = Signal(str, str)  # emitted as (old_name, new_name) after ingredient rename
     navigate_to_recipe = Signal(str)  # emitted when user double-clicks a recipe reference
 
     def __init__(self, parent: QWidget | None = None):
@@ -262,6 +263,7 @@ class IngredientPanel(QWidget):
             return
 
         ing = self._selected_ingredient
+        old_name = ing.name
         new_name = self._name_edit.text().strip()
         if not new_name:
             QMessageBox.warning(self, "无效输入", "食材名称不能为空。")
@@ -286,6 +288,8 @@ class IngredientPanel(QWidget):
 
         self._save_btn.setEnabled(False)
         self.ingredient_changed.emit()
+        if old_name != new_name:
+            self.ingredient_renamed.emit(old_name, new_name)
         self.refresh_list()
 
     def _on_delete(self):
@@ -326,6 +330,7 @@ class IngredientPanel(QWidget):
             self._selected_ingredient = None
             self._detail_frame.setVisible(False)
             self.ingredient_changed.emit()
+            self.ingredient_renamed.emit(remove_name, keep_name)
             self.refresh_list()
 
     # ------------------------------------------------------------------

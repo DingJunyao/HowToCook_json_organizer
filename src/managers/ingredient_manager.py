@@ -1,4 +1,7 @@
 from __future__ import annotations
+import json
+from pathlib import Path
+
 from src.models.ingredient import Ingredient
 
 
@@ -86,3 +89,39 @@ class IngredientManager:
             self._name_index[ing.name] = key
             for alias in ing.aliases:
                 self._name_index[alias] = key
+
+    def update_all_recipes(self, recipe_files: list[Path],
+                           replacements: dict[str, str]) -> int:
+        """Replace ingredient names across all recipe JSON files.
+
+        Args:
+            recipe_files: List of recipe JSON file paths.
+            replacements: Mapping of old_name -> new_name.
+
+        Returns:
+            Number of files modified.
+        """
+        if not replacements:
+            return 0
+
+        modified_count = 0
+        for fp in recipe_files:
+            if not fp.is_file():
+                continue
+            try:
+                data = json.loads(fp.read_text(encoding="utf-8"))
+                changed = False
+                for ing in data.get("ingredients", []):
+                    old_name = ing.get("ingredient_name", "")
+                    if old_name in replacements:
+                        ing["ingredient_name"] = replacements[old_name]
+                        changed = True
+                if changed:
+                    fp.write_text(
+                        json.dumps(data, ensure_ascii=False, indent=2),
+                        encoding="utf-8",
+                    )
+                    modified_count += 1
+            except Exception:
+                pass
+        return modified_count
