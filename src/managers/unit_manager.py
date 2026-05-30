@@ -136,12 +136,21 @@ class UnitManager:
     def get_all(self) -> list[Unit]:
         return list(self._units.values())
 
-    def get_display_names(self) -> list[str]:
-        """Return all names + aliases sorted, for dropdown population."""
-        names = []
-        for unit in self._units.values():
-            names.append(unit.name)
-        return sorted(names, key=lambda s: s.lower())
+    def get_display_names(self,
+                          usage_counts: dict[str, int] | None = None,
+                          ) -> list[str]:
+        """Return all names sorted for dropdown population.
+
+        When *usage_counts* is provided, units are ordered by descending
+        usage frequency so that the most common units appear first.
+        Ties (including zero-usage units) fall back to alphabetical order.
+        """
+        names = [unit.name for unit in self._units.values()]
+        if usage_counts:
+            names.sort(key=lambda s: (-usage_counts.get(s, 0), s.lower()))
+        else:
+            names.sort(key=lambda s: s.lower())
+        return names
 
     def update(self, key: str, name: str | None = None,
                aliases: list[str] | None = None) -> None:

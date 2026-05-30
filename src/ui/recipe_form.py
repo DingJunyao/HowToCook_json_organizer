@@ -1085,12 +1085,21 @@ class RecipeForm(QWidget):
         self._source_path = source_path
         self._fm = fm
 
+    def _unit_display_names(self) -> list[str]:
+        """Return unit display names, sorted by usage frequency when possible."""
+        if self._um:
+            counts = None
+            if self._fm:
+                _, counts = self._fm.compute_usage_counts()
+            return self._um.get_display_names(usage_counts=counts)
+        return []
+
     def _create_unit_combo(self, selected: str = "") -> QComboBox:
         """Create a QComboBox for the unit column."""
         combo = QComboBox()
         combo.setEditable(False)
         if self._um:
-            combo.addItems(self._um.get_display_names())
+            combo.addItems(self._unit_display_names())
         if selected:
             name = selected
             if self._um:
@@ -1138,7 +1147,7 @@ class RecipeForm(QWidget):
                 combo.blockSignals(True)
                 combo.clear()
                 if self._um:
-                    combo.addItems(self._um.get_display_names())
+                    combo.addItems(self._unit_display_names())
                     # Resolve old value to current primary name via alias index
                     if current:
                         unit = self._um.get_by_name(current)
@@ -1149,7 +1158,14 @@ class RecipeForm(QWidget):
                 combo.blockSignals(False)
 
     def batch_rename_unit(self, old_name: str, new_name: str):
-        """Replace unit text across all ingredient rows."""
+        """Replace unit text across all ingredient rows.
+
+        Preserves the previous dirty state so that batch operations from
+        the ingredient / unit panels do not mark an unmodified recipe as
+        dirty (which would trigger an unwanted "unsaved changes" prompt
+        when switching recipes).
+        """
+        was_dirty = self._dirty
         for row in range(self.ingredients_table.rowCount()):
             combo = self.ingredients_table.cellWidget(row, 3)
             if isinstance(combo, QComboBox) and combo.currentText() == old_name:
@@ -1160,15 +1176,19 @@ class RecipeForm(QWidget):
                 else:
                     combo.setEditText(new_name)
                 combo.blockSignals(False)
-        self._set_dirty(True)
+        self._set_dirty(was_dirty)
 
     def batch_rename_ingredient(self, old_name: str, new_name: str):
-        """Replace ingredient name across all ingredient rows."""
+        """Replace ingredient name across all ingredient rows.
+
+        Preserves the previous dirty state — see ``batch_rename_unit``.
+        """
+        was_dirty = self._dirty
         for row in range(self.ingredients_table.rowCount()):
             name_item = self.ingredients_table.item(row, 0)
             if name_item is not None and name_item.text() == old_name:
                 name_item.setText(new_name)
-        self._set_dirty(True)
+        self._set_dirty(was_dirty)
 
     def _update_completer(self):
         """Update the auto-completer with ingredient names and aliases."""
