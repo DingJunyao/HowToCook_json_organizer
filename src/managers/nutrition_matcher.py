@@ -49,11 +49,12 @@ class NutritionMatcher:
         Duplicate entries (same description + description_zh from different USDA
         data sources) are deduplicated, keeping the entry with the most nutrient data.
         """
-        if not query.strip():
+        q = query.strip()
+        if len(q) < 2:
             return []
 
-        q = query.lower().strip()
-        words = q.split()
+        q_lower = q.lower()
+        words = q_lower.split()
 
         tier_exact: list[USDAEntry] = []    # 1. desc_zh == q
         tier_prefix: list[USDAEntry] = []   # 2. desc_zh.startswith(q)
@@ -65,13 +66,13 @@ class NutritionMatcher:
             desc_en = entry.description.lower()
             desc_zh = entry.description_zh.lower()
 
-            if desc_zh == q:
+            if desc_zh == q_lower:
                 tier_exact.append(entry)
-            elif desc_zh.startswith(q):
+            elif desc_zh.startswith(q_lower):
                 tier_prefix.append(entry)
-            elif q in desc_zh:
+            elif q_lower in desc_zh:
                 tier_substr.append(entry)
-            elif q in desc_en:
+            elif q_lower in desc_en:
                 tier_en.append(entry)
             elif len(words) > 1:
                 combined = f"{desc_en} {desc_zh}"
@@ -93,7 +94,7 @@ class NutritionMatcher:
                     seen.add(key)
                     results.append(entry)
 
-        return results[:30]
+        return results[:500]
 
     def get_nutrition(self, fdc_id: int) -> list[NutritionFact]:
         entry = self._index.get(fdc_id)

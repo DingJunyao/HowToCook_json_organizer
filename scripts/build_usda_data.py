@@ -3,15 +3,44 @@
 一键构建 USDA 营养数据库：下载 → 提取 → AI翻译 → 合并。
 
 用法:
-    python scripts/build_usda_data.py              # 完整构建
-    python scripts/build_usda_data.py --skip-download  # 跳过下载，使用已有文件
+    python scripts/build_usda_data.py              # 完整构建 (默认 Claude Code)
+    python scripts/build_usda_data.py --skip-download  # 跳过下载
     python scripts/build_usda_data.py --skip-translate # 跳过翻译
+    python scripts/build_usda_data.py --translate-only # 仅翻译未完成条目（不重新下载）
+
+翻译提供者:
+    claude-code   Claude Code CLI (默认，需安装)
+    openai        OpenAI API 及兼容接口 (DeepSeek / Ollama / vLLM)
+    anthropic     Anthropic API 直接调用
+    deepl         DeepL 翻译平台 (EN→ZH 质量最佳)
+
+示例:
+    # Claude Code
+    python scripts/build_usda_data.py
+
+    # OpenAI
+    python scripts/build_usda_data.py --translator openai --translator-api-key sk-xxx
+
+    # Anthropic
+    python scripts/build_usda_data.py --translator anthropic --translator-api-key sk-ant-xxx
+
+    # DeepSeek (OpenAI 兼容)
+    python scripts/build_usda_data.py --translator openai --translator-base-url https://api.deepseek.com/v1 --translator-api-key sk-xxx --translator-model deepseek-chat
+
+    # DeepL
+    python scripts/build_usda_data.py --translator deepl --translator-api-key xxx
+
+    # 环境变量
+    set TRANSLATOR=openai
+    set TRANSLATOR_API_KEY=sk-xxx
+    set TRANSLATOR_BASE_URL=https://api.deepseek.com/v1
+    set TRANSLATOR_MODEL=deepseek-chat
+    python scripts/build_usda_data.py
+
+    # 列出提供者
+    python scripts/build_usda_data.py --list-translators
 
 输出: data/usda_nutrition.json（~78 MB，紧凑 JSON）
-
-要求:
-    - claude CLI 已安装: npm install -g @anthropic-ai/claude-code
-    - 或设置环境变量 CLAUDE_BIN 指向 claude 可执行文件
 """
 
 from __future__ import annotations
@@ -23,7 +52,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -152,7 +180,6 @@ NUTRIENT_TRANSLATIONS: dict[str, str] = {
     "Oxalic acid": "草酸",
 }
 
-
 def _translate_fatty_acid(name: str) -> str | None:
     """为特定脂肪酸名称生成中文翻译。"""
     m = re.match(r"^SFA (\d+:\d+)$", name)
@@ -175,11 +202,9 @@ def _translate_fatty_acid(name: str) -> str | None:
         return f"反式脂肪酸 {m.group(1)}{suffix}"
     return None
 
-
 # ============================================================================
 # 下载
 # ============================================================================
-
 
 def _scrape_download_urls() -> dict[str, str]:
     """从 USDA 下载页面抓取各数据集的最新下载链接。
@@ -189,7 +214,7 @@ def _scrape_download_urls() -> dict[str, str]:
     """
     log("[INFO] 正在获取 USDA 下载页面...")
     try:
-        req = urllib.request.Request(USDA_DOWNLOADS_URL, headers={"User-Agent": "Mozilla/5.0"})
+        req = urllib.request.Request(USDA_DOWNLOADS_URL, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0"})
         with urllib.request.urlopen(req, timeout=30) as resp:
             html = resp.read().decode("utf-8")
     except Exception as e:
@@ -207,18 +232,42 @@ def _scrape_download_urls() -> dict[str, str]:
     for m in re.finditer(r'href="(\/fdc-datasets\/[^"]+\.zip)"', html):
         zip_urls.append("https://fdc.nal.usda.gov" + m.group(1))
 
-    # 按关键词匹配到 dataset
-    matched: dict[str, str] = {}
+    # 按关键词匹配到 dataset，收集所有候选 URL
+    candidates: dict[str, list[str]] = {name: [] for _, name in DATASET_PATTERNS}
     for url in sorted(set(zip_urls)):
         url_lower = url.lower()
         for pattern, name in DATASET_PATTERNS:
             if pattern in url_lower:
-                if name not in matched:
-                    matched[name] = url
-                    log(f"[INFO]   找到 {name}: {Path(url).name}")
+                if url not in candidates[name]:
+                    candidates[name].append(url)
+
+    # 对每个 dataset，优先选 JSON 格式，其次选最新（按文件名中的日期排序）
+    matched: dict[str, str] = {}
+    for name, urls in candidates.items():
+        if not urls:
+            log(f"[INFO]   未找到 {name} 的下载链接")
+            continue
+
+        # 分类：JSON vs 非 JSON
+        json_urls = [u for u in urls if "json" in Path(u).name.lower()]
+        csv_urls = [u for u in urls if u not in json_urls]
+
+        # 优先 JSON，兜底 CSV
+        preferred = json_urls if json_urls else csv_urls
+
+        # 在同格式中选最新的（文件名含日期，如 2026-04-30）
+        def _extract_date(u: str) -> str:
+            m = re.search(r"(\d{4}-\d{2}-\d{2})", u)
+            return m.group(1) if m else "0000-00-00"
+
+        preferred.sort(key=_extract_date, reverse=True)
+        best = preferred[0]
+        matched[name] = best
+
+        fmt = "JSON" if best in json_urls else "CSV"
+        log(f"[INFO]   找到 {name} ({fmt}): {Path(best).name}")
 
     return matched
-
 
 def _download_file(url: str, dest: Path) -> bool:
     """下载单个文件，带进度显示。"""
@@ -256,7 +305,6 @@ def _download_file(url: str, dest: Path) -> bool:
         if dest.exists():
             dest.unlink()
         return False
-
 
 def download_datasets() -> dict[str, Path]:
     """下载或定位所有 USDA 数据集。
@@ -301,11 +349,9 @@ def download_datasets() -> dict[str, Path]:
 
     return results
 
-
 # ============================================================================
 # 营养素提取
 # ============================================================================
-
 
 def _extract_nutrient(food_nutrient: dict) -> dict | None:
     """从 USDA foodNutrients 条目中提取营养素信息。"""
@@ -337,21 +383,15 @@ def _extract_nutrient(food_nutrient: dict) -> dict | None:
         "unit": unit,
     }
 
+def _extract_nutrients_from_json(zf: zipfile.ZipFile) -> list[dict]:
+    """从 ZIP 中的 JSON 文件提取营养素数据。"""
+    json_files = [n for n in zf.namelist() if n.endswith(".json")]
+    if not json_files:
+        return []
 
-def extract_from_zip(zip_path: Path, dataset_name: str) -> list[dict]:
-    """从 ZIP 文件中提取 USDA JSON 数据并抽取营养素。"""
-    log(f"[STEP] 提取 {dataset_name} 营养素数据")
-
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        # 找到 JSON 文件
-        json_files = [n for n in zf.namelist() if n.endswith(".json")]
-        if not json_files:
-            log(f"[ERROR]   ZIP 文件中没有 JSON 文件")
-            return []
-
-        log(f"[INFO]   读取: {json_files[0]}")
-        with zf.open(json_files[0]) as f:
-            data = json.loads(f.read().decode("utf-8"))
+    log(f"[INFO]   读取 JSON: {json_files[0]}")
+    with zf.open(json_files[0]) as f:
+        data = json.loads(f.read().decode("utf-8"))
 
     # 定位食物数组
     if isinstance(data, list):
@@ -373,11 +413,100 @@ def extract_from_zip(zip_path: Path, dataset_name: str) -> list[dict]:
     else:
         foods = []
 
+    return foods
+
+def _extract_nutrients_from_csv(zf: zipfile.ZipFile) -> list[dict]:
+    """从 ZIP 中的 CSV 文件提取营养素数据（兜底方案）。"""
+    import csv as csv_module
+    import io
+
+    # 读取 nutrient.csv 建立营养素名称映射
+    nutrient_map: dict[str, dict] = {}
+    for csv_name in zf.namelist():
+        if csv_name.lower().endswith("nutrient.csv"):
+            with zf.open(csv_name) as f:
+                reader = csv_module.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig"))
+                for row in reader:
+                    nid = row.get("id", "")
+                    nutrient_map[nid] = {
+                        "name": row.get("name", ""),
+                        "unit": row.get("unit_name", ""),
+                    }
+            log(f"[INFO]   加载 {len(nutrient_map)} 条营养素定义")
+            break
+
+    # 读取 food.csv 建立食物列表
+    foods: dict[str, dict] = {}
+    for csv_name in zf.namelist():
+        if csv_name.lower().endswith("food.csv"):
+            with zf.open(csv_name) as f:
+                reader = csv_module.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig"))
+                for row in reader:
+                    fid = row.get("fdc_id", "")
+                    if fid:
+                        foods[fid] = {
+                            "fdc_id": int(fid),
+                            "description": row.get("description", ""),
+                            "nutrients": [],
+                        }
+            log(f"[INFO]   加载 {len(foods)} 条食物条目")
+            break
+
+    # 读取 food_nutrient.csv 关联营养素
+    for csv_name in zf.namelist():
+        if csv_name.lower().endswith("food_nutrient.csv"):
+            with zf.open(csv_name) as f:
+                reader = csv_module.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig"))
+                for row in reader:
+                    fid = row.get("fdc_id", "")
+                    nid = row.get("nutrient_id", "")
+                    amount_str = row.get("amount", "")
+                    if fid in foods and nid in nutrient_map and amount_str:
+                        try:
+                            amount = float(amount_str)
+                        except ValueError:
+                            continue
+                        nm = nutrient_map[nid]
+                        n = _extract_nutrient({
+                            "nutrientName": nm["name"],
+                            "unitName": nm["unit"],
+                            "value": amount,
+                        })
+                        if n is not None:
+                            foods[fid]["nutrients"].append(n)
+            break
+
+    return list(foods.values())
+
+def extract_from_zip(zip_path: Path, dataset_name: str) -> list[dict]:
+    """从 ZIP 文件中提取 USDA 数据并抽取营养素。
+
+    优先解析 JSON 格式，兜底解析 CSV 格式。
+    """
+    log(f"[STEP] 提取 {dataset_name} 营养素数据")
+
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        # 优先尝试 JSON 格式
+        foods = _extract_nutrients_from_json(zf)
+
+        if not foods:
+            log("[INFO]   ZIP 中无 JSON 文件，尝试解析 CSV 格式...")
+            foods = _extract_nutrients_from_csv(zf)
+
+        if not foods:
+            log(f"[ERROR]   ZIP 文件中没有可解析的数据（JSON 或 CSV）")
+            return []
+
     log(f"[INFO]   共 {len(foods)} 条食物条目")
 
     results = []
     skipped = 0
     for i, food in enumerate(foods):
+        # 跳过 null 条目（新版 USDA JSON 末尾可能包含 null）
+        if food is None:
+            skipped += 1
+            continue
+
         fdc_id = food.get("fdcId") or food.get("fdc_id")
         description = food.get("description", "")
         if not fdc_id or not description:
@@ -390,6 +519,10 @@ def extract_from_zip(zip_path: Path, dataset_name: str) -> list[dict]:
             n = _extract_nutrient(fn)
             if n is not None:
                 nutrients.append(n)
+
+        # 如果 foodNutrients 不在顶层（CSV 解析已展开），直接使用
+        if not nutrients and isinstance(food.get("nutrients"), list):
+            nutrients = food["nutrients"]
 
         results.append({
             "fdc_id": fdc_id,
@@ -405,189 +538,524 @@ def extract_from_zip(zip_path: Path, dataset_name: str) -> list[dict]:
     log(f"[INFO]   提取完成: {len(results)} 条, {total_nutrients} 条营养素记录, 跳过 {skipped} 条")
     return results
 
-
 # ============================================================================
-# AI 翻译
+# AI 翻译 — 翻译提供者
 # ============================================================================
 
+from abc import ABC, abstractmethod
 
-def _check_claude_available() -> bool:
-    """检查 claude CLI 是否可用。"""
-    try:
-        result = subprocess.run(
-            [CLAUDE_BIN, "--version"],
-            capture_output=True, text=True, timeout=10,
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
+class TranslationProvider(ABC):
+    """翻译提供者基类。"""
 
+    name: str = ""          # 内部标识名
+    description: str = ""   # 人类可读描述
 
-def _translate_batch(batch: list[dict], batch_num: int, total_batches: int) -> list[dict]:
-    """用 claude -p 翻译一批食物描述。
+    @abstractmethod
+    def translate(self, prompt: str) -> str | None:
+        """发送翻译请求，返回原始响应文本。失败返回 None。"""
+        ...
 
-    Args:
-        batch: [{"fdc_id": ..., "description": ...}, ...]
-        batch_num: 当前批次号 (1-based)
-        total_batches: 总批次数
+    def check_available(self) -> bool:
+        """检查提供者是否可用。"""
+        return True
 
-    Returns:
-        同 batch，但 description_zh 字段已填入翻译
-    """
-    input_json = json.dumps(batch, ensure_ascii=False)
+    def __repr__(self) -> str:
+        return f"{self.name}"
 
-    prompt = f"""你是 USDA 食物数据库翻译专家。请将以下食物描述翻译为中文，填入 description_zh 字段。
+# ---------------------------------------------------------------------------
+# Claude Code CLI 提供者
+# ---------------------------------------------------------------------------
 
-翻译规则：
-1. 食材名称要准确（Chicken→鸡肉, Salmon→三文鱼, Broccoli→西兰花, Cheddar→切达奶酪）
-2. 加工方式用中文括号标注（raw→（生）, cooked→（熟）, canned→（罐装）, frozen→（冷冻）, dried→（干）, baked→（烤）, fried→（炸）, boiled→（煮）, steamed→（蒸）, smoked→（熏制）, pickled→（腌）, fermented→（发酵））
-3. 部位准确（breast→胸肉, thigh→腿肉, tenderloin→里脊, loin→里脊, wing→翅, leg→腿, belly→五花肉, rib→肋骨, shoulder→肩肉）
-4. 状态标注（boneless→（去骨）, skinless→（去皮）, lowfat→（低脂）, nonfat→（脱脂）, salted→（加盐）, unsalted→（无盐）, sweetened→（加糖）, unsweetened→（无糖）, fortified→（强化）, enriched→（强化）, whole grain→（全谷物））
-5. 去除 USDA 元数据标记（NFS, NS as to type, UPC:xxx, "contains x and y" 等冗余信息），不要翻译这些标记，直接省略
-6. 如果无法确定翻译，保留英文原文
-7. 翻译结果应该简洁、自然、符合中文表达习惯
+class ClaudeCodeProvider(TranslationProvider):
+    name = "claude-code"
+    description = "Claude Code CLI (本地运行 claude -p)"
 
-请输出纯 JSON 数组（不要用 markdown 代码块包裹，直接输出 [{{ 开头的 JSON）：
+    def check_available(self) -> bool:
+        try:
+            result = subprocess.run(
+                [CLAUDE_BIN, "--version"],
+                capture_output=True, text=True, timeout=10,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
 
-{input_json}"""
+    def translate(self, prompt: str) -> str | None:
+        try:
+            result = subprocess.run(
+                [CLAUDE_BIN, "-p", "--allowedTools", "Read,Write"],
+                input=prompt,
+                capture_output=True, text=True,
+                timeout=3600,
+                encoding="utf-8",
+            )
+            if result.returncode != 0:
+                return None
+            return result.stdout.strip()
+        except Exception:
+            return None
 
-    log(f"[TRANSLATE] 批次 {batch_num}/{total_batches} ({len(batch)} 条)...", end="")
+# ---------------------------------------------------------------------------
+# OpenAI 兼容 API 提供者
+# ---------------------------------------------------------------------------
 
-    try:
-        result = subprocess.run(
-            [CLAUDE_BIN, "-p", prompt],
-            capture_output=True, text=True,
-            timeout=300,  # 5 分钟超时
-            encoding="utf-8",
-        )
+class OpenAICompatibleProvider(TranslationProvider):
+    name = "openai"
+    description = "OpenAI API 及兼容接口 (DeepSeek / Ollama / vLLM / 等)"
 
-        if result.returncode != 0:
-            log(f" 失败: claude 返回码 {result.returncode}")
-            if result.stderr:
-                log(f"           {result.stderr[:200]}")
-            return batch
+    def __init__(self, api_key: str = "", base_url: str = "",
+                 model: str = "gpt-4o") -> None:
+        self.api_key = api_key or os.environ.get("TRANSLATOR_API_KEY", "")
+        self.base_url = (base_url or os.environ.get("TRANSLATOR_BASE_URL",
+                         "https://api.openai.com/v1")).rstrip("/")
+        self.model = model or os.environ.get("TRANSLATOR_MODEL", "gpt-4o")
 
-        output = result.stdout.strip()
+    def check_available(self) -> bool:
+        return bool(self.api_key)
 
-        # 尝试解析 JSON
-        translated = _parse_claude_output(output, batch)
-        if translated:
-            log(f" 完成 ({sum(1 for t in translated if t.get('description_zh') and t['description_zh'] != t.get('description', ''))} 条已翻译)")
+    def translate(self, prompt: str) -> str | None:
+        url = f"{self.base_url}/chat/completions"
+        body = json.dumps({
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": "你是一个精确的 JSON 翻译器。请严格按要求输出 JSON 数组，不要添加任何解释。"},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.1,
+            "max_tokens": 64000,
+        }, ensure_ascii=False).encode("utf-8")
+
+        req = urllib.request.Request(url, data=body, method="POST")
+        req.add_header("Authorization", f"Bearer {self.api_key}")
+        req.add_header("Content-Type", "application/json")
+
+        try:
+            with urllib.request.urlopen(req, timeout=600) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            return content.strip() if content else None
+        except Exception as e:
+            log(f"[API ERROR] OpenAI 请求失败: {e}")
+            return None
+
+# ---------------------------------------------------------------------------
+# Anthropic API 提供者
+# ---------------------------------------------------------------------------
+
+class AnthropicAPIProvider(TranslationProvider):
+    name = "anthropic"
+    description = "Anthropic API 直接调用"
+
+    def __init__(self, api_key: str = "", model: str = "") -> None:
+        self.api_key = api_key or os.environ.get("TRANSLATOR_API_KEY", "")
+        self.model = (model or os.environ.get("TRANSLATOR_MODEL",
+                      "claude-sonnet-4-6"))
+
+    def check_available(self) -> bool:
+        return bool(self.api_key)
+
+    def translate(self, prompt: str) -> str | None:
+        url = "https://api.anthropic.com/v1/messages"
+        body = json.dumps({
+            "model": self.model,
+            "max_tokens": 64000,
+            "system": "你是一个精确的 JSON 翻译器。请严格按要求输出 JSON 数组，不要添加任何解释。",
+            "messages": [
+                {"role": "user", "content": prompt},
+            ],
+        }, ensure_ascii=False).encode("utf-8")
+
+        req = urllib.request.Request(url, data=body, method="POST")
+        req.add_header("x-api-key", self.api_key)
+        req.add_header("anthropic-version", "2023-06-01")
+        req.add_header("Content-Type", "application/json")
+
+        try:
+            with urllib.request.urlopen(req, timeout=600) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            content = data.get("content", [{}])
+            texts = [b.get("text", "") for b in content if b.get("type") == "text"]
+            return "\n".join(texts).strip() or None
+        except Exception as e:
+            log(f"[API ERROR] Anthropic 请求失败: {e}")
+            return None
+
+# ---------------------------------------------------------------------------
+# DeepL 翻译平台 API 提供者
+# ---------------------------------------------------------------------------
+
+class DeepLProvider(TranslationProvider):
+    name = "deepl"
+    description = "DeepL 翻译平台 (EN→ZH 质量最佳，按字符计费)"
+
+    def __init__(self, api_key: str = "", base_url: str = "") -> None:
+        self.api_key = api_key or os.environ.get("TRANSLATOR_API_KEY", "")
+        self.base_url = (base_url or os.environ.get("TRANSLATOR_BASE_URL",
+                         "https://api-free.deepl.com")).rstrip("/")
+
+    def check_available(self) -> bool:
+        return bool(self.api_key)
+
+    def translate(self, prompt: str) -> str | None:
+        """DeepL 不支持直接翻译 prompt，请使用 translate_texts 方法。"""
+        return None
+
+    def translate_texts(self, texts: list[str]) -> list[str] | None:
+        """批量翻译纯文本列表，返回同序译文列表。"""
+        from urllib.parse import urlencode
+        url = f"{self.base_url}/v2/translate"
+        params = [("target_lang", "ZH"), ("source_lang", "EN")]
+        for t in texts:
+            params.append(("text", t))
+        body = urlencode(params).encode("utf-8")
+
+        req = urllib.request.Request(url, data=body, method="POST")
+        req.add_header("Authorization", f"DeepL-Auth-Key {self.api_key}")
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            translations = data.get("translations", [])
+            return [t.get("text", "") for t in translations]
+        except Exception as e:
+            log(f"[API ERROR] DeepL 请求失败: {e}")
+            return None
+
+# ---------------------------------------------------------------------------
+# 提供者注册表
+# ---------------------------------------------------------------------------
+
+PROVIDER_CLASSES: dict[str, type[TranslationProvider]] = {
+    "claude-code": ClaudeCodeProvider,
+    "openai": OpenAICompatibleProvider,
+    "anthropic": AnthropicAPIProvider,
+    "deepl": DeepLProvider,
+}
+
+def create_provider(name: str, **kwargs) -> TranslationProvider | None:
+    """根据名称创建翻译提供者实例。"""
+    cls = PROVIDER_CLASSES.get(name)
+    if cls is None:
+        return None
+
+    import inspect
+    sig = inspect.signature(cls.__init__)
+    accepted = set(sig.parameters.keys()) - {"self"}
+    filtered = {k: v for k, v in kwargs.items() if k in accepted}
+    return cls(**filtered)
+
+def list_providers() -> list[dict]:
+    """列出所有可用翻译提供者及其描述。"""
+    return [
+        {"name": name, "description": cls.description}
+        for name, cls in PROVIDER_CLASSES.items()
+    ]
+
+# ---------------------------------------------------------------------------
+# 批量翻译核心逻辑
+# ---------------------------------------------------------------------------
+
+def _build_translation_prompt(slim_batch: list[dict],
+                               output_path: Path | None = None) -> str:
+    """构建翻译 prompt。"""
+    lines = [
+        "你是 USDA 食物数据库翻译专家。请将以下食物描述的 description 字段翻译为中文，填入 description_zh 字段，输出完整的 JSON 数组。",
+        "",
+        "翻译规则：",
+        "1. 食材名称要准确（Chicken→鸡肉, Salmon→三文鱼, Broccoli→西兰花, Cheddar→切达奶酪）",
+        "2. 加工方式用中文括号标注（raw→（生）, cooked→（熟）, canned→（罐装）, frozen→（冷冻）, dried→（干）, baked→（烤）, fried→（炸）, boiled→（煮）, steamed→（蒸）, smoked→（熏制）, pickled→（腌）, fermented→（发酵））",
+        "3. 部位准确（breast→胸肉, thigh→腿肉, tenderloin→里脊, loin→里脊, wing→翅, leg→腿, belly→五花肉, rib→肋骨, shoulder→肩肉）",
+        "4. 状态标注（boneless→（去骨）, skinless→（去皮）, lowfat→（低脂）, nonfat→（脱脂）, salted→（加盐）, unsalted→（无盐）, sweetened→（加糖）, unsweetened→（无糖）, fortified→（强化）, enriched→（强化）, whole grain→（全谷物））",
+        "5. 去除 USDA 元数据标记（NFS, NS as to type, UPC:xxx, \"contains x and y\" 等冗余信息），不要翻译这些标记，直接省略",
+        "6. 如果无法确定翻译，保留英文原文",
+        "7. 翻译结果应该简洁、自然、符合中文表达习惯",
+        "8. 每个元素的 fdc_id 必须保持不变",
+        f"9. 必须翻译全部 {len(slim_batch)} 条，不可省略任何条目",
+        "",
+    ]
+
+    if output_path:
+        lines.append(f"【重要】翻译结果必须使用 Write 工具写入文件 {output_path}，格式为纯 JSON 数组。")
+
+    lines.append("--- 待翻译数据 ---")
+    lines.append(json.dumps(slim_batch, ensure_ascii=False))
+
+    return "\n".join(lines)
+
+def _translate_batch(
+    batch: list[dict],
+    slim_batch: list[dict],
+    batch_num: int,
+    total_batches: int,
+    provider: TranslationProvider,
+) -> list[dict]:
+    """用指定提供者翻译一批食物描述，带重试逻辑。"""
+    MAX_RETRIES = 3
+
+    # ---- DeepL 特殊处理 ----
+    if isinstance(provider, DeepLProvider):
+        return _translate_batch_deepl(batch, slim_batch, batch_num, total_batches, provider)
+
+    # ---- LLM 提供者 ----
+    is_claude = isinstance(provider, ClaudeCodeProvider)
+    input_path = DATA_DIR / f"_batch_{batch_num:04d}_input.json"
+    output_path = DATA_DIR / f"_batch_{batch_num:04d}_output.json" if is_claude else None
+
+    if is_claude:
+        input_path.write_text(json.dumps(slim_batch, ensure_ascii=False), encoding="utf-8")
+
+    prompt = _build_translation_prompt(slim_batch, output_path)
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        if output_path and output_path.exists():
+            output_path.unlink()
+
+        label = f"[TRANSLATE] 批次 {batch_num}/{total_batches} ({len(batch)} 条)"
+        if attempt > 1:
+            label += f" [重试 {attempt}/{MAX_RETRIES}]"
+        log(f"{label}...", end="")
+
+        try:
+            raw = provider.translate(prompt)
+
+            if raw is None:
+                log(" 失败: 无响应")
+                if attempt < MAX_RETRIES:
+                    continue
+                break
+
+            # Claude Code: 优先从输出文件读取
+            if is_claude and output_path and output_path.exists():
+                raw = output_path.read_text(encoding="utf-8").strip()
+
+            translated = _parse_json_data(raw)
+            if translated and len(translated) == len(slim_batch):
+                count = sum(
+                    1 for t in translated
+                    if t.get("description_zh") and t["description_zh"] != t.get("description", "")
+                )
+                log(f" 完成 ({count} 条已翻译)")
+                _cleanup_temp_files(input_path, output_path)
+                return translated
+            else:
+                got = len(translated) if translated else 0
+                log(f" 解析失败 (条目数: {got}, 期望: {len(slim_batch)})")
+                debug_path = DATA_DIR / f"translation_debug_batch_{batch_num:04d}_attempt{attempt}.txt"
+                debug_path.write_text(raw[:5000], encoding="utf-8")
+
+        except Exception as e:
+            log(f" 错误: {e}")
+
+        if attempt < MAX_RETRIES:
+            log(f"           即将重试...")
+
+    _cleanup_temp_files(input_path, output_path)
+    return batch
+
+def _translate_batch_deepl(
+    batch: list[dict],
+    slim_batch: list[dict],
+    batch_num: int,
+    total_batches: int,
+    provider: "DeepLProvider",
+) -> list[dict]:
+    """使用 DeepL 翻译一批食物描述（纯文本翻译 → 映射回 JSON）。"""
+    MAX_RETRIES = 3
+    descriptions = [item["description"] for item in slim_batch]
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        label = f"[TRANSLATE] 批次 {batch_num}/{total_batches} ({len(batch)} 条, DeepL)"
+        if attempt > 1:
+            label += f" [重试 {attempt}/{MAX_RETRIES}]"
+        log(f"{label}...", end="")
+
+        try:
+            translations = provider.translate_texts(descriptions)
+            if translations is None or len(translations) != len(descriptions):
+                log(f" 失败: 译文数量不匹配")
+                if attempt < MAX_RETRIES:
+                    continue
+                break
+
+            translated = []
+            for item, zh_text in zip(slim_batch, translations):
+                translated.append({
+                    "fdc_id": item["fdc_id"],
+                    "description": item["description"],
+                    "description_zh": zh_text,
+                })
+
+            count = sum(
+                1 for t in translated
+                if t.get("description_zh") and t["description_zh"] != t.get("description", "")
+            )
+            log(f" 完成 ({count} 条已翻译)")
             return translated
-        else:
-            log(" 失败: 无法解析输出 JSON")
-            # 保存失败输出以便调试
-            debug_path = DATA_DIR / f"translation_debug_batch_{batch_num}.txt"
-            debug_path.write_text(output[:5000], encoding="utf-8")
-            log(f"           调试输出已保存到 {debug_path}")
-            return batch
 
-    except subprocess.TimeoutExpired:
-        log(" 超时")
-        return batch
-    except Exception as e:
-        log(f" 错误: {e}")
-        return batch
+        except Exception as e:
+            log(f" 错误: {e}")
 
+        if attempt < MAX_RETRIES:
+            log(f"           即将重试...")
 
-def _parse_claude_output(output: str, fallback_batch: list[dict]) -> list[dict] | None:
-    """解析 claude 输出，提取 JSON 数组。"""
-    # 方法1: 直接解析整个输出
+    return batch
+
+def _cleanup_temp_files(*paths: Path | None) -> None:
+    """清理临时文件。"""
+    for p in paths:
+        if p is None:
+            continue
+        try:
+            if p.exists():
+                p.unlink()
+        except OSError:
+            pass
+
+def _parse_json_data(raw: str) -> list[dict] | None:
+    """解析 JSON 数据，提取翻译结果数组。"""
+    if not raw:
+        return None
+
+    # 方法1: 直接解析
     try:
-        data = json.loads(output)
+        data = json.loads(raw)
         if isinstance(data, list) and len(data) > 0 and "fdc_id" in data[0]:
             return data
     except json.JSONDecodeError:
         pass
 
     # 方法2: 提取 ```json ... ``` 代码块
-    m = re.search(r"```(?:json)?\s*\n?(\[.*?\])\s*```", output, re.DOTALL)
+    m = re.search(r"```(?:json)?\s*\n?(\[.*?\])\s*```", raw, re.DOTALL)
     if m:
         try:
             data = json.loads(m.group(1))
-            if isinstance(data, list) and len(data) > 0:
+            if isinstance(data, list) and len(data) > 0 and "fdc_id" in data[0]:
                 return data
         except json.JSONDecodeError:
             pass
 
     # 方法3: 提取最外层 [ ... ] 数组
-    m = re.search(r"\[.*\]", output, re.DOTALL)
+    m = re.search(r"\[.*\]", raw, re.DOTALL)
     if m:
         try:
             data = json.loads(m.group(0))
-            if isinstance(data, list) and len(data) > 0:
+            if isinstance(data, list) and len(data) > 0 and "fdc_id" in data[0]:
                 return data
         except json.JSONDecodeError:
             pass
 
     return None
 
+# ---------------------------------------------------------------------------
+# 批量翻译主函数
+# ---------------------------------------------------------------------------
 
-def translate_with_claude(
+def translate_descriptions(
     all_data: list[dict],
+    provider: TranslationProvider,
     progress_cb: Callable[[int, int], None] | None = None,
     batch_size: int = BATCH_SIZE,
 ) -> list[dict]:
-    """使用 Claude AI 批量翻译所有食物描述。
+    """使用指定提供者批量翻译所有食物描述。
 
-    Args:
-        all_data: 食物数据列表
-        progress_cb: 进度回调 (current, total)
-
-    Returns:
-        已翻译的数据（原地修改 all_data 中的 description_zh）
+    内置收敛循环：每轮翻译未完成的条目，直到全部翻译完成
+    或连续 3 轮未翻译数量不再减少为止。
     """
-    if not _check_claude_available():
-        log("[ERROR] claude CLI 不可用。请先安装: npm install -g @anthropic-ai/claude-code")
+    MAX_STALLED_PASSES = 3
+
+    if not provider.check_available():
+        log(f"[ERROR] 翻译提供者 '{provider.name}' 不可用。")
+        if isinstance(provider, ClaudeCodeProvider):
+            log("[INFO] 请安装: npm install -g @anthropic-ai/claude-code")
+        elif isinstance(provider, (OpenAICompatibleProvider, AnthropicAPIProvider, DeepLProvider)):
+            log("[INFO] 请设置: --translator-api-key 或 环境变量 TRANSLATOR_API_KEY")
         log("[INFO] 跳过翻译，description_zh 将留空")
         return all_data
 
-    log(f"[STEP] AI 翻译食物描述 (使用 {CLAUDE_BIN} -p)")
+    provider_label = f"{provider.name}"
+    if isinstance(provider, OpenAICompatibleProvider):
+        provider_label += f" ({provider.model})"
+    elif isinstance(provider, AnthropicAPIProvider):
+        provider_label += f" ({provider.model})"
 
-    # 只翻译尚未翻译的条目
-    to_translate = [item for item in all_data if not item.get("description_zh")]
-    already_translated = len(all_data) - len(to_translate)
+    log(f"[STEP] AI 翻译食物描述 (提供者: {provider_label})")
 
-    if already_translated > 0:
-        log(f"[INFO]   {already_translated} 条已有翻译，跳过")
+    total_all = len(all_data)
+    already_done = sum(1 for item in all_data if item.get("description_zh") and item["description_zh"] != item.get("description", ""))
+    if already_done > 0:
+        log(f"[INFO]   {already_done}/{total_all} 条已有翻译")
 
-    if not to_translate:
-        log("[INFO]   所有条目已翻译，无需翻译")
-        return all_data
+    stalled_passes = 0
+    last_untranslated_count: int | None = None
+    total_round = 0
 
-    total_batches = (len(to_translate) + batch_size - 1) // batch_size
-    log(f"[INFO]   需要翻译 {len(to_translate)} 条，分为 {total_batches} 批，每批 {batch_size} 条")
+    while True:
+        total_round += 1
+        to_translate = [item for item in all_data if not item.get("description_zh")]
 
-    translated_count = 0
-    for batch_num in range(1, total_batches + 1):
-        start = (batch_num - 1) * batch_size
-        end = min(start + batch_size, len(to_translate))
-        batch = to_translate[start:end]
+        if not to_translate:
+            log("[INFO]   所有条目已翻译完毕!")
+            break
 
-        # 调用 claude 翻译
-        translated_batch = _translate_batch(batch, batch_num, total_batches)
+        current_untranslated = len(to_translate)
 
-        # 将翻译结果写回
-        for item in translated_batch:
-            if item.get("description_zh") and item["description_zh"] != item.get("description", ""):
-                translated_count += 1
-            # 更新原始数据
-            for orig_item in to_translate:
-                if orig_item["fdc_id"] == item["fdc_id"]:
-                    orig_item["description_zh"] = item.get("description_zh", "")
+        # 检查收敛
+        if last_untranslated_count is not None:
+            if current_untranslated == last_untranslated_count:
+                stalled_passes += 1
+                if stalled_passes >= MAX_STALLED_PASSES:
+                    log(f"[INFO]   连续 {MAX_STALLED_PASSES} 轮无进展（{current_untranslated} 条未翻译），停止翻译")
                     break
+            else:
+                stalled_passes = 0
+        last_untranslated_count = current_untranslated
 
-        if progress_cb:
-            progress_cb(batch_num, total_batches)
+        if total_round > 1:
+            log(f"[INFO]   === 第 {total_round} 轮翻译: {current_untranslated} 条待翻译 ===")
 
-    log(f"[INFO]   AI 翻译完成: {translated_count}/{len(to_translate)} 条")
+        total_batches = (len(to_translate) + batch_size - 1) // batch_size
+        log(f"[INFO]   分为 {total_batches} 批，每批 {batch_size} 条")
+
+        round_translated = 0
+        for batch_num in range(1, total_batches + 1):
+            start = (batch_num - 1) * batch_size
+            end = min(start + batch_size, len(to_translate))
+            batch = to_translate[start:end]
+
+            slim_batch = [
+                {"fdc_id": item["fdc_id"], "description": item["description"]}
+                for item in batch
+            ]
+
+            translated_batch = _translate_batch(batch, slim_batch, batch_num, total_batches, provider)
+
+            for item in translated_batch:
+                if item.get("description_zh") and item["description_zh"] != item.get("description", ""):
+                    round_translated += 1
+                for orig_item in to_translate:
+                    if orig_item["fdc_id"] == item["fdc_id"]:
+                        orig_item["description_zh"] = item.get("description_zh", "")
+                        break
+
+            if progress_cb:
+                progress_cb(batch_num, total_batches)
+
+        log(f"[INFO]   第 {total_round} 轮完成: 翻译 {round_translated}/{len(to_translate)} 条")
+        if stalled_passes == 0 and current_untranslated > 0:
+            # 有进展但仍有余量，继续下一轮
+            remaining = sum(1 for item in all_data if not item.get("description_zh"))
+            if remaining > 0:
+                log(f"[INFO]   仍有 {remaining} 条未翻译，继续下一轮...")
+
+    total_translated = sum(1 for item in all_data if item.get("description_zh") and item["description_zh"] != item.get("description", ""))
+    final_untranslated = total_all - total_translated
+    log(f"[INFO]   AI 翻译完成: {total_translated}/{total_all} 条已翻译, {final_untranslated} 条仍未翻译")
     return all_data
-
 
 # ============================================================================
 # 合并与输出
 # ============================================================================
-
 
 def merge_and_output(all_data: list[dict]) -> Path:
     """合并去重并写入输出文件。"""
@@ -627,34 +1095,37 @@ def merge_and_output(all_data: list[dict]) -> Path:
 
     return out_path
 
-
 # ============================================================================
 # 进度日志
 # ============================================================================
-
 
 def log(msg: str, end: str = "\n") -> None:
     """输出进度日志（UI 通过 stdout 读取）。"""
     print(msg, end=end, flush=True)
 
-
 # ============================================================================
 # 主流程
 # ============================================================================
-
 
 def build_usda_data(
     skip_download: bool = False,
     skip_translate: bool = False,
     batch_size: int = BATCH_SIZE,
     progress_cb: Callable[[int, int], None] | None = None,
+    translator: str = "claude-code",
+    translator_kwargs: dict | None = None,
+    translate_only: bool = False,
 ) -> bool:
     """主入口：一键构建 USDA 营养数据库。
 
     Args:
         skip_download: 跳过下载步骤
         skip_translate: 跳过翻译步骤
+        batch_size: 每批翻译数量
         progress_cb: 翻译进度回调 (current_batch, total_batches)
+        translator: 翻译提供者名称 (claude-code / openai / anthropic / deepl)
+        translator_kwargs: 传递给翻译提供者的额外参数 (api_key, base_url, model 等)
+        translate_only: 仅翻译模式：加载已有输出文件，只翻译未翻译的条目
 
     Returns:
         是否成功
@@ -663,22 +1134,62 @@ def build_usda_data(
     log("  USDA 营养数据库构建工具")
     log("=" * 60)
 
-    # ---- 1. 下载 ----
     all_data: list[dict] = []
+    existing_output = DATA_DIR / "usda_nutrition.json"
+    old_translations: dict[int, str] = {}  # fdc_id → description_zh
 
-    if skip_download:
-        log("[STEP] 跳过下载，使用已有数据文件")
-        # 查找已有的提取结果（data/*_raw.json 或 usda_nutrition.json）
-        existing_output = DATA_DIR / "usda_nutrition.json"
-        if existing_output.exists():
-            log(f"[INFO]   发现已有输出: {existing_output}")
-            log(f"[INFO]   如需重新构建，请删除该文件或使用 --force")
+    # ---- 0. 仅翻译模式 ----
+    if translate_only:
+        log("[STEP] 仅翻译模式：加载已有数据，只翻译未完成条目")
+        if not existing_output.exists():
+            log("[ERROR] 没有找到 usda_nutrition.json")
+            log("[INFO] 请先运行完整构建: python scripts/build_usda_data.py")
+            return False
+
+        with open(existing_output, encoding="utf-8") as f:
+            all_data = json.load(f)
+
+        total = len(all_data)
+        untranslated = sum(1 for item in all_data if not item.get("description_zh"))
+        log(f"[INFO]   加载 {total} 条, 已翻译 {total - untranslated} 条, 未翻译 {untranslated} 条")
+
+        if untranslated == 0:
+            log("[OK] 所有条目已翻译，无需翻译")
             return True
 
-        # 查找 ZIP 文件
+        # 直接跳到翻译步骤
+        if skip_translate:
+            log("[STEP] 跳过 AI 翻译")
+        else:
+            provider = create_provider(translator, **(translator_kwargs or {}))
+            if provider is None:
+                log(f"[ERROR] 未知的翻译提供者: {translator}")
+                return False
+            all_data = translate_descriptions(all_data, provider, progress_cb, batch_size)
+
+        merge_and_output(all_data)
+        return True
+
+    # ---- 1. 加载已有翻译（用于保留） ----
+    if existing_output.exists():
+        try:
+            with open(existing_output, encoding="utf-8") as f:
+                old_data = json.load(f)
+            old_translations = {
+                item["fdc_id"]: item.get("description_zh", "")
+                for item in old_data
+                if item.get("description_zh") and item["description_zh"] != item.get("description", "")
+            }
+            if old_translations:
+                log(f"[INFO]   从已有输出保留 {len(old_translations)} 条翻译")
+        except (json.JSONDecodeError, OSError, KeyError):
+            pass
+
+    # ---- 2. 下载 ----
+    if skip_download:
+        log("[STEP] 跳过下载，使用已有数据文件")
         zip_files = list(DATA_DIR.glob("*.zip"))
         if not zip_files:
-            # 查找 raw JSON 文件
             raw_files = list(DATA_DIR.glob("*raw*.json"))
             if raw_files:
                 for rf in raw_files:
@@ -695,7 +1206,7 @@ def build_usda_data(
             log("[ERROR] 没有可用的数据源，终止")
             return False
 
-    # ---- 2. 提取营养素 ----
+    # ---- 3. 提取营养素 ----
     if not all_data:
         if skip_download:
             zip_files_for_extract = list(DATA_DIR.glob("*.zip"))
@@ -704,7 +1215,6 @@ def build_usda_data(
                 log("[INFO] 请运行: python scripts/build_usda_data.py")
                 return False
             for zf in zip_files_for_extract:
-                # 推断数据集名称
                 name_lower = zf.name.lower()
                 for pattern, label in DATASET_PATTERNS:
                     if pattern in name_lower:
@@ -723,21 +1233,38 @@ def build_usda_data(
 
     log(f"[STEP] 提取完成，共 {len(all_data)} 条食物条目")
 
-    # ---- 3. AI 翻译 ----
+    # ---- 3.5 将已有翻译合并到新提取的数据 ----
+    if old_translations:
+        restored = 0
+        for item in all_data:
+            if not item.get("description_zh") and item["fdc_id"] in old_translations:
+                item["description_zh"] = old_translations[item["fdc_id"]]
+                restored += 1
+        if restored:
+            log(f"[INFO]   恢复 {restored} 条已有翻译到新数据")
+
+    # ---- 4. AI 翻译 ----
     if skip_translate:
         log("[STEP] 跳过 AI 翻译")
     else:
-        all_data = translate_with_claude(all_data, progress_cb, batch_size)
+        provider = create_provider(translator, **(translator_kwargs or {}))
+        if provider is None:
+            log(f"[ERROR] 未知的翻译提供者: {translator}")
+            log(f"[INFO] 可用提供者: {', '.join(PROVIDER_CLASSES.keys())}")
+            log("[INFO] 跳过翻译，description_zh 将留空")
+        else:
+            all_data = translate_descriptions(all_data, provider, progress_cb, batch_size)
 
-    # ---- 4. 合并输出 ----
+    # ---- 5. 合并输出 ----
     merge_and_output(all_data)
     return True
-
 
 def main():
     parser = argparse.ArgumentParser(
         description="一键构建 USDA 营养数据库：下载 → 提取 → AI翻译 → 合并"
     )
+
+    # 流程控制
     parser.add_argument(
         "--skip-download", action="store_true",
         help="跳过下载步骤，使用 data/ 目录中已有的 ZIP 文件"
@@ -750,15 +1277,94 @@ def main():
         "--batch-size", type=int, default=BATCH_SIZE,
         help=f"每批翻译的条目数 (默认: {BATCH_SIZE})"
     )
+    parser.add_argument(
+        "--translate-only", action="store_true",
+        help="仅翻译模式：加载已有的 usda_nutrition.json，只翻译未完成的条目，不重新下载"
+    )
+
+    # 翻译提供者选择
+    parser.add_argument(
+        "--translator", type=str,
+        default=os.environ.get("TRANSLATOR", "claude-code"),
+        choices=list(PROVIDER_CLASSES.keys()),
+        help="翻译提供者 (默认: claude-code, 环境变量: TRANSLATOR)"
+    )
+    parser.add_argument(
+        "--translator-api-key", type=str,
+        default=os.environ.get("TRANSLATOR_API_KEY", ""),
+        help="翻译 API Key (环境变量: TRANSLATOR_API_KEY)"
+    )
+    parser.add_argument(
+        "--translator-base-url", type=str,
+        default=os.environ.get("TRANSLATOR_BASE_URL", ""),
+        help="翻译 API 基础 URL (环境变量: TRANSLATOR_BASE_URL)。\n"
+             "OpenAI 兼容: https://api.openai.com/v1 或自定义 (如 DeepSeek: https://api.deepseek.com/v1)\n"
+             "DeepL: https://api-free.deepl.com (免费) 或 https://api.deepl.com (Pro)"
+    )
+    parser.add_argument(
+        "--translator-model", type=str,
+        default=os.environ.get("TRANSLATOR_MODEL", ""),
+        help="翻译模型名称 (环境变量: TRANSLATOR_MODEL)。\n"
+             "OpenAI: gpt-4o (默认); Anthropic: claude-sonnet-4-6 (默认); 自定义兼容: 按实际填写"
+    )
+    parser.add_argument(
+        "--list-translators", action="store_true",
+        help="列出所有可用的翻译提供者并退出"
+    )
+
     args = parser.parse_args()
+
+    if args.list_translators:
+        print("\n可用的翻译提供者:")
+        print("-" * 60)
+        for p in list_providers():
+            print(f"  {p['name']:<15} {p['description']}")
+        print()
+        print("推荐翻译平台 API:")
+        print("  DeepL       https://www.deepl.com/pro-api  (EN→ZH 质量最佳)")
+        print("  Google      https://cloud.google.com/translate")
+        print("  Azure       https://azure.microsoft.com/zh-cn/services/cognitive-services/translator/")
+        print("  DeepSeek    https://platform.deepseek.com/api-docs/  (OpenAI 兼容，中文友好)")
+        print()
+        print("用法示例:")
+        print("  # Claude Code (默认)")
+        print("  python scripts/build_usda_data.py")
+        print()
+        print("  # OpenAI")
+        print("  python scripts/build_usda_data.py --translator openai --translator-api-key sk-xxx")
+        print()
+        print("  # Anthropic")
+        print("  python scripts/build_usda_data.py --translator anthropic --translator-api-key sk-ant-xxx")
+        print()
+        print("  # DeepSeek (OpenAI 兼容)")
+        print("  python scripts/build_usda_data.py --translator openai --translator-base-url https://api.deepseek.com/v1 --translator-api-key sk-xxx --translator-model deepseek-chat")
+        print()
+        print("  # DeepL 翻译平台")
+        print("  python scripts/build_usda_data.py --translator deepl --translator-api-key xxx")
+        print()
+        print("  # 通过环境变量配置")
+        print("  set TRANSLATOR=openai")
+        print("  set TRANSLATOR_API_KEY=sk-xxx")
+        print("  python scripts/build_usda_data.py")
+        return
+
+    translator_kwargs: dict[str, str] = {}
+    if args.translator_api_key:
+        translator_kwargs["api_key"] = args.translator_api_key
+    if args.translator_base_url:
+        translator_kwargs["base_url"] = args.translator_base_url
+    if args.translator_model:
+        translator_kwargs["model"] = args.translator_model
 
     success = build_usda_data(
         skip_download=args.skip_download,
         batch_size=args.batch_size,
         skip_translate=args.skip_translate,
+        translator=args.translator,
+        translator_kwargs=translator_kwargs or None,
+        translate_only=args.translate_only,
     )
     sys.exit(0 if success else 1)
-
 
 if __name__ == "__main__":
     main()
