@@ -1,6 +1,7 @@
 # src/ui/nutrition_tab.py
 from PySide6.QtWidgets import QHBoxLayout, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
+from src.managers.file_manager import FileManager
 from src.managers.ingredient_manager import IngredientManager
 from src.managers.nutrition_matcher import NutritionMatcher
 from src.ui.merge_dialog import MergeDialog
@@ -12,6 +13,7 @@ class NutritionTab(QWidget):
     def __init__(self):
         super().__init__()
         self._manager: IngredientManager | None = None
+        self._fm: FileManager | None = None
         outer = QHBoxLayout(self)
 
         # 左栏 - 食材列表 + 工具按钮
@@ -37,14 +39,34 @@ class NutritionTab(QWidget):
         self._ingredient_list.ingredient_selected.connect(
             self._panel.set_ingredient
         )
+        # 信号连接: 匹配/取消匹配 -> 保存并刷新
+        self._panel.ingredient_updated.connect(self._on_ingredient_updated)
 
     def set_ingredient_manager(self, mgr: IngredientManager) -> None:
         self._manager = mgr
         self._ingredient_list.set_ingredient_manager(mgr)
         self._panel.set_ingredient_manager(mgr)
 
+    def set_file_manager(self, fm: FileManager) -> None:
+        self._fm = fm
+
     def set_nutrition_matcher(self, matcher: NutritionMatcher) -> None:
         self._panel.set_nutrition_matcher(matcher)
+
+    def set_on_usda_import(self, callback: callable) -> None:
+        self._panel.set_on_usda_import(callback)
+
+    def _on_ingredient_updated(self) -> None:
+        """保存食材数据（包含 USDA 匹配信息）并刷新左侧列表。"""
+        if self._fm is not None and self._manager is not None:
+            try:
+                ingredients_data = {}
+                for ing in self._manager.get_all():
+                    ingredients_data[ing.key] = ing.to_dict()
+                self._fm.save_ingredients(ingredients_data)
+            except Exception as e:
+                print(f"[NutritionTab] Warning: could not save ingredients.json: {e}")
+        self._ingredient_list.refresh_list()
 
     def _on_merge_clicked(self) -> None:
         if self._manager is None:

@@ -24,7 +24,12 @@ from PySide6.QtWidgets import (
 from src.managers.file_manager import FileManager
 from src.managers.ingredient_manager import IngredientManager
 
-CATEGORIES = ["蔬菜", "肉类", "水产", "禽蛋", "豆制品", "主食/谷物", "调料", "饮品", "干货", "其他"]
+# Preferred display order for known categories; unknown categories are appended at the end.
+_DEFAULT_CATEGORY_ORDER = [
+    "蔬菜", "肉类", "水产", "禽蛋", "乳制品", "豆制品",
+    "主食/谷物", "淀粉/粉类", "调料", "饮品", "水果", "坚果",
+    "油脂", "干货", "其他",
+]
 
 
 class IngredientPanel(QWidget):
@@ -39,7 +44,22 @@ class IngredientPanel(QWidget):
         self._mgr: IngredientManager | None = None
         self._fm: FileManager | None = None
         self._selected_ingredient = None  # currently selected Ingredient object
+        self._categories: list[str] = list(_DEFAULT_CATEGORY_ORDER)
         self._setup_ui()
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _rebuild_categories(self) -> list[str]:
+        """Build ordered category list from default order + any categories in data."""
+        categories = list(_DEFAULT_CATEGORY_ORDER)
+        if self._mgr:
+            for ing in self._mgr.get_all():
+                if ing.category and ing.category not in categories:
+                    categories.append(ing.category)
+        self._categories = categories
+        return categories
 
     # ------------------------------------------------------------------
     # UI construction
@@ -101,7 +121,7 @@ class IngredientPanel(QWidget):
         cat_row = QHBoxLayout()
         cat_row.addWidget(QLabel("分类:"))
         self._category_combo = QComboBox()
-        self._category_combo.addItems(CATEGORIES)
+        self._category_combo.addItems(self._categories)
         self._category_combo.setEditable(True)
         self._category_combo.currentIndexChanged.connect(self._on_field_changed)
         cat_row.addWidget(self._category_combo, 1)
@@ -143,11 +163,26 @@ class IngredientPanel(QWidget):
     def set_ingredient_manager(self, mgr: IngredientManager):
         """Set the ingredient manager and refresh the list."""
         self._mgr = mgr
+        self._rebuild_categories()
+        self._update_category_combo()
         self.refresh_list()
 
     def set_file_manager(self, fm: FileManager):
         """Set the file manager for reverse lookup."""
         self._fm = fm
+
+    def _update_category_combo(self) -> None:
+        """Re-populate the category combo box from the current categories."""
+        self._category_combo.blockSignals(True)
+        current = self._category_combo.currentText()
+        self._category_combo.clear()
+        self._category_combo.addItems(self._categories)
+        idx = self._category_combo.findText(current)
+        if idx >= 0:
+            self._category_combo.setCurrentIndex(idx)
+        elif current:
+            self._category_combo.setEditText(current)
+        self._category_combo.blockSignals(False)
 
     def refresh_list(self):
         """Reload ingredients from the manager into the tree."""
@@ -163,13 +198,13 @@ class IngredientPanel(QWidget):
         query = self._search_edit.text().strip().lower()
         ingredients = self._mgr.search(query) if query else self._mgr.get_all()
 
-        # Group by category using the defined order
-        by_category: dict[str, list] = {cat: [] for cat in CATEGORIES}
+        # Group by category using the dynamic category order
+        by_category: dict[str, list] = {cat: [] for cat in self._categories}
         for ing in ingredients:
             cat = ing.category if ing.category in by_category else "其他"
-            by_category[cat].append(ing)
+            by_category.setdefault(cat, []).append(ing)
 
-        for cat in CATEGORIES:
+        for cat in self._categories:
             items = by_category[cat]
             cat_item = QTreeWidgetItem(self._tree, [f"{cat} ({len(items)})"])
             cat_item.setData(0, Qt.ItemDataRole.UserRole, None)

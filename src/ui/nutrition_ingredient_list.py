@@ -12,8 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.managers.ingredient_manager import IngredientManager
-
-CATEGORIES = ["蔬菜", "肉类", "水产", "禽蛋", "豆制品", "主食/谷物", "调料", "饮品", "干货", "其他"]
+from src.ui.ingredient_panel import _DEFAULT_CATEGORY_ORDER
 
 
 class NutritionIngredientList(QWidget):
@@ -24,6 +23,7 @@ class NutritionIngredientList(QWidget):
         self._manager: IngredientManager | None = None
         self._filter_mode: str = "全部"
         self._search_text: str = ""
+        self._categories: list[str] = list(_DEFAULT_CATEGORY_ORDER)
         self._setup_ui()
 
     def _setup_ui(self):
@@ -63,7 +63,17 @@ class NutritionIngredientList(QWidget):
 
     def set_ingredient_manager(self, mgr: IngredientManager) -> None:
         self._manager = mgr
+        self._rebuild_categories()
         self.refresh_list()
+
+    def _rebuild_categories(self) -> None:
+        """Build ordered category list from default order + data."""
+        categories = list(_DEFAULT_CATEGORY_ORDER)
+        if self._manager:
+            for ing in self._manager.get_all():
+                if ing.category and ing.category not in categories:
+                    categories.append(ing.category)
+        self._categories = categories
 
     def refresh_list(self) -> None:
         self._tree.clear()
@@ -72,7 +82,7 @@ class NutritionIngredientList(QWidget):
 
         ingredients = self._manager.get_all()
 
-        for cat in CATEGORIES:
+        for cat in self._categories:
             cat_items: list[QTreeWidgetItem] = []
             for ing in ingredients:
                 if ing.category != cat:

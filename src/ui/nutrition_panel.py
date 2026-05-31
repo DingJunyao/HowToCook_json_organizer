@@ -1,7 +1,7 @@
 # src/ui/nutrition_panel.py
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -20,8 +20,7 @@ from PySide6.QtWidgets import (
 from src.managers.ingredient_manager import IngredientManager
 from src.managers.nutrition_matcher import NutritionMatcher
 from src.models.nutrition import NutritionFact, USDAEntry
-
-CATEGORIES = ["蔬菜", "肉类", "水产", "禽蛋", "豆制品", "主食/谷物", "调料", "饮品", "干货", "其他"]
+from src.ui.ingredient_panel import _DEFAULT_CATEGORY_ORDER
 
 
 class NutritionPanel(QWidget):
@@ -36,6 +35,7 @@ class NutritionPanel(QWidget):
         self._manager: IngredientManager | None = None
         self._current_key: str | None = None
         self._current_search_results: list[USDAEntry] = []
+        self._on_usda_import_cb: callable | None = None
 
         outer = QHBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -69,7 +69,7 @@ class NutritionPanel(QWidget):
         # Category
         form.addWidget(QLabel("分类"))
         self._category_combo = QComboBox()
-        self._category_combo.addItems(CATEGORIES)
+        self._category_combo.addItems(list(_DEFAULT_CATEGORY_ORDER))
         form.addWidget(self._category_combo)
 
         # Update button
@@ -92,6 +92,15 @@ class NutritionPanel(QWidget):
         self._unmatch_btn.clicked.connect(self._on_unmatch)
         layout.addWidget(self._unmatch_btn)
 
+        # "Download USDA data" button (shown when no data)
+        self._download_usda_btn = QPushButton("下载 USDA 数据...")
+        self._download_usda_btn.setToolTip(
+            "从 USDA FoodData Central 下载营养数据并使用 AI 翻译为中文"
+        )
+        self._download_usda_btn.clicked.connect(self._on_download_usda)
+        self._download_usda_btn.setVisible(False)
+        layout.addWidget(self._download_usda_btn)
+
         # Search bar
         search_row = QHBoxLayout()
         self._search_edit = QLineEdit()
@@ -107,6 +116,7 @@ class NutritionPanel(QWidget):
         # Candidate list
         self._candidate_list = QListWidget()
         self._candidate_list.itemClicked.connect(self._on_candidate_clicked)
+        self._candidate_list.currentItemChanged.connect(self._on_candidate_changed)
         layout.addWidget(self._candidate_list, 1)
 
         # Match button
@@ -137,9 +147,46 @@ class NutritionPanel(QWidget):
 
     def set_nutrition_matcher(self, matcher: NutritionMatcher) -> None:
         self._matcher = matcher
+        self._update_data_available_ui()
 
     def set_ingredient_manager(self, mgr: IngredientManager) -> None:
         self._manager = mgr
+        self._update_category_combo()
+
+    def set_on_usda_import(self, callback: callable) -> None:
+        """Set callback to trigger USDA data download + import.
+
+        The callback will be called when the user clicks "下载 USDA 数据..."
+        After the callback returns, set_nutrition_matcher should be called
+        with the new matcher.
+        """
+        self._on_usda_import_cb = callback
+
+    def _update_data_available_ui(self) -> None:
+        """Show/hide download button and search controls based on data presence."""
+        has_data = self._matcher is not None and self._matcher.has_data
+        self._download_usda_btn.setVisible(not has_data)
+        self._search_btn.setEnabled(has_data)
+        self._search_edit.setEnabled(has_data)
+        self._match_btn.setEnabled(has_data)
+
+    def _update_category_combo(self) -> None:
+        """Re-populate the category combo box from default order + data."""
+        categories = list(_DEFAULT_CATEGORY_ORDER)
+        if self._manager:
+            for ing in self._manager.get_all():
+                if ing.category and ing.category not in categories:
+                    categories.append(ing.category)
+        self._category_combo.blockSignals(True)
+        current = self._category_combo.currentText()
+        self._category_combo.clear()
+        self._category_combo.addItems(categories)
+        idx = self._category_combo.findText(current)
+        if idx >= 0:
+            self._category_combo.setCurrentIndex(idx)
+        elif current:
+            self._category_combo.setEditText(current)
+        self._category_combo.blockSignals(False)
 
     def set_ingredient(self, ingredient_key: str) -> None:
         """Load an ingredient's details and match status into the center panel."""
@@ -164,10 +211,12 @@ class NutritionPanel(QWidget):
         # Update match status
         self._update_match_status(ing)
 
-        # Clear search state
-        self._search_edit.clear()
+        # Auto-fill search with ingredient name and trigger search
+        self._search_edit.setText(ing.name)
         self._candidate_list.clear()
         self._current_search_results = []
+        if self._matcher and self._matcher.has_data:
+            self._on_search()
 
         # If matched, show nutrition in right panel
         if ing.usda_match_status == "matched" and ing.usda_id is not None and self._matcher:
@@ -243,12 +292,25 @@ class NutritionPanel(QWidget):
         if self._matcher is None:
             return
 
+        if not self._matcher.has_data:
+            self._candidate_list.clear()
+            item = QListWidgetItem("⚠ 未加载 USDA 数据，请点击上方「下载 USDA 数据...」按钮")
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
+            self._candidate_list.addItem(item)
+            return
+
         query = self._search_edit.text().strip()
         if not query:
             return
 
         self._current_search_results = self._matcher.search(query)
         self._candidate_list.clear()
+
+        if not self._current_search_results:
+            item = QListWidgetItem("（无匹配结果）")
+            item.setData(0x0100, None)
+            self._candidate_list.addItem(item)
+            return
 
         for entry in self._current_search_results:
             label = f"{entry.description_zh} ({entry.description})" if entry.description_zh else entry.description
@@ -262,7 +324,13 @@ class NutritionPanel(QWidget):
         if not isinstance(fdc_id, int) or self._matcher is None:
             return
         nutrients = self._matcher.get_nutrition(fdc_id)
-        self.show_nutrition(nutrients)
+        if nutrients:
+            self.show_nutrition(nutrients)
+
+    def _on_candidate_changed(self, current: QListWidgetItem, _previous: QListWidgetItem) -> None:
+        """Show nutrition preview when the current candidate changes (click or keyboard)."""
+        if current is not None:
+            self._on_candidate_clicked(current)
 
     def _on_match(self) -> None:
         """Confirm match between selected ingredient and selected USDA entry."""
@@ -302,3 +370,8 @@ class NutritionPanel(QWidget):
         self._update_match_status(ing)
         self._nutrition_table.setRowCount(0)
         self.ingredient_updated.emit()
+
+    def _on_download_usda(self) -> None:
+        """Trigger USDA data download via callback set by main window."""
+        if self._on_usda_import_cb:
+            self._on_usda_import_cb()

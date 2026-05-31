@@ -20,9 +20,11 @@ from src.ui.settings_dialog import SettingsDialog
 
 CATEGORY_EN_TO_ZH = {
     "vegetables": "蔬菜", "meat": "肉类", "seafood": "水产",
-    "eggs": "禽蛋", "dairy": "豆制品", "grains": "主食/谷物",
-    "seasoning": "调料", "beverages": "饮品", "oil": "干货",
-    "fruits": "水果", "nuts": "坚果", "others": "其他",
+    "eggs": "禽蛋", "dairy": "乳制品", "soy": "豆制品",
+    "grains": "主食/谷物", "starch": "淀粉/粉类",
+    "seasoning": "调料", "beverages": "饮品", "oil": "油脂",
+    "fruits": "水果", "nuts": "坚果", "dried": "干货",
+    "others": "其他",
 }
 
 
@@ -58,6 +60,10 @@ class MainWindow(QMainWindow):
 
         self._sync_action = settings_menu.addAction("仓库同步")
         self._sync_action.triggered.connect(self._on_git_sync)
+
+        settings_menu.addSeparator()
+        self._usda_import_action = settings_menu.addAction("下载 USDA 数据...")
+        self._usda_import_action.triggered.connect(self._on_usda_import)
 
         # Status bar with sync button
         self._status_sync_btn = QPushButton("⟳ 同步")
@@ -112,9 +118,15 @@ class MainWindow(QMainWindow):
                 # Translate English category to Chinese
                 category = CATEGORY_EN_TO_ZH.get(category_raw, category_raw)
                 if name:
-                    self._im.add(name=name, aliases=aliases, category=category)
+                    ing = self._im.add(name=name, aliases=aliases, category=category)
+                    # Restore USDA match status from persisted data
+                    usda_id = item.get("usda_id")
+                    if usda_id is not None:
+                        ing.usda_id = usda_id
+                    ing.usda_match_status = item.get("usda_match_status", "unmatched")
         self.recipe_tab.set_ingredient_manager(self._im)
         self.nutrition_tab.set_ingredient_manager(self._im)
+        self.nutrition_tab.set_file_manager(self._fm)
 
         # Unit manager — persisted data takes priority over defaults
         self._um = UnitManager()
@@ -143,19 +155,8 @@ class MainWindow(QMainWindow):
                 print(f"[MainWindow] Discovered {new_count} new unit(s) from recipes: {discovered_units}")
         self.recipe_tab.set_unit_manager(self._um)
 
-        # Nutrition matcher (loaded from nutritions.json if present)
-        nutritions_path = output_dir / "out" / "nutritions.json"
-        usda_data: list[dict] = []
-        if nutritions_path.exists():
-            import json
-            try:
-                raw = json.loads(nutritions_path.read_text(encoding="utf-8"))
-                usda_data = self._convert_nutritions(raw)
-            except Exception:
-                usda_data = []
-
-        self._nm = NutritionMatcher(usda_data)
-        self.nutrition_tab.set_nutrition_matcher(self._nm)
+        # Nutrition matcher
+        self._load_nutrition_data(output_dir)
 
         self.statusBar().showMessage(
             f"已加载 — 源: {source_dir}  输出: {output_dir}"
@@ -191,9 +192,77 @@ class MainWindow(QMainWindow):
             })
         return result
 
+    def _load_nutrition_data(self, output_dir: Path | None = None) -> None:
+        """Load USDA nutrition data from bundled file and optional user data.
+
+        Creates/replaces self._nm and propagates to nutrition_tab.
+        """
+        import json
+
+        usda_data: list[dict] = []
+
+        # 1) Bundled USDA nutrition database (data/usda_nutrition.json)
+        bundled_path = Path(__file__).resolve().parent.parent.parent / "data" / "usda_nutrition.json"
+        if bundled_path.exists():
+            try:
+                raw = json.loads(bundled_path.read_text(encoding="utf-8"))
+                if isinstance(raw, list):
+                    usda_data.extend(raw)
+                    self.statusBar().showMessage(
+                        f"已加载 USDA 营养数据: {len(raw)} 条", 5000
+                    )
+            except Exception:
+                pass
+
+        # 2) User-provided nutritions.json (legacy format, merged with lower priority)
+        if output_dir is not None:
+            nutritions_path = output_dir / "out" / "nutritions.json"
+            if nutritions_path.exists():
+                try:
+                    raw = json.loads(nutritions_path.read_text(encoding="utf-8"))
+                    converted = self._convert_nutritions(raw)
+                    existing_ids = {e.get("fdc_id") for e in usda_data}
+                    for entry in converted:
+                        if entry.get("fdc_id") not in existing_ids:
+                            usda_data.append(entry)
+                except Exception:
+                    pass
+
+        self._nm = NutritionMatcher(usda_data)
+        self.nutrition_tab.set_nutrition_matcher(self._nm)
+        self.nutrition_tab.set_on_usda_import(self._on_usda_import)
+
+    # ------------------------------------------------------------------
+    # USDA data import
+    # ------------------------------------------------------------------
+
+    def _on_usda_import(self) -> None:
+        """Open the USDA data import dialog."""
+        from src.ui.usda_import_dialog import open_usda_import
+
+        def _on_ready() -> None:
+            """Reload nutrition data after successful build."""
+            self._load_nutrition_data()
+            self.statusBar().showMessage("USDA 营养数据已更新", 5000)
+
+        dlg = open_usda_import(self, on_data_ready=_on_ready)
+        if dlg is not None:
+            dlg.exec()
+            # Reload again after dialog closes (in case data was already there
+            # and the dialog just confirmed rebuild)
+            if dlg._finished_success:
+                self._load_nutrition_data()
+
     # ------------------------------------------------------------------
     # Git sync
     # ------------------------------------------------------------------
+
+    def _reload_managers(self) -> None:
+        """Reload all managers from disk (e.g. after git pull updated files)."""
+        config = SettingsDialog.load_config()
+        ok, _ = SettingsDialog.validate_paths(config)
+        if ok:
+            self._apply_config(config)
 
     def _run_git_sync(self) -> None:
         """Run startup sync dialog if output_dir is a valid git repo."""
@@ -212,6 +281,7 @@ class MainWindow(QMainWindow):
             from src.ui.git_sync_dialog import GitSyncDialog
             dlg = GitSyncDialog(output_dir, parent=self)
             dlg.exec()
+            self._reload_managers()
         except Exception as e:
             # Ensure sync errors never prevent the main window from showing
             import logging
@@ -251,6 +321,7 @@ class MainWindow(QMainWindow):
         self._sync_action.setEnabled(True)
         self._status_sync_btn.setEnabled(True)
         self.statusBar().showMessage(message, 5000)
+        self._reload_managers()
 
     def _on_sync_error(self, message: str) -> None:
         self._sync_action.setEnabled(True)
@@ -288,6 +359,7 @@ class MainWindow(QMainWindow):
         self._sync_action.setEnabled(True)
         self._status_sync_btn.setEnabled(True)
         self.statusBar().showMessage(result if ok else result, 5000)
+        self._reload_managers()
 
     # ------------------------------------------------------------------
     # Slots

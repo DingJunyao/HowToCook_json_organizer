@@ -100,16 +100,55 @@ howtocook-organizer
 
 ## USDA 离线数据
 
-USDA 营养数据需要预先准备：
+USDA 营养数据包含三个数据集，覆盖 **13,590 种食物**：
 
-1. 从 [USDA FoodData Central](https://fdc.nal.usda.gov/download-datasets.html) 下载 Foundation Foods 数据
-2. 运行准备脚本：
+| 数据集 | 条目数 | 说明 |
+| ------ | ------ | ---- |
+| Foundation Foods | 365 | USDA 最新基础食材数据库 |
+| SR Legacy | 7,793 | 原 Standard Reference 数据库 |
+| FNDDS (Survey Foods) | 5,432 | 膳食调查数据库（含混合菜肴） |
+
+### 一键构建（推荐）
+
+在应用的 **食材营养管理** 标签页点击「下载 USDA 数据...」按钮，或通过菜单 **工具 → 下载 USDA 数据...** 启动自动构建流程。
+
+构建流程会自动完成：
+
+1. 从 [USDA FoodData Central](https://fdc.nal.usda.gov/download-datasets.html) 下载最新数据
+2. 提取全部营养素信息（150+ 种营养素中文翻译）
+3. 调用 Claude AI 翻译所有食物描述为中文
+4. 合并去重，输出 `data/usda_nutrition.json`
+
+> **要求**: 需要安装 `claude` CLI 用于 AI 翻译（`npm install -g @anthropic-ai/claude-code`）。
+> 首次构建需要 10-30 分钟（取决于网络速度和翻译批次数）。
+
+### 手动构建
+
+也可以分步手动执行：
 
 ```bash
-python scripts/prepare_usda_data.py --input path/to/foundation_foods.json --output data/usda_nutrition.json
+# 一键构建（推荐）
+python scripts/build_usda_data.py
+
+# 或分步执行
+python scripts/build_usda_data.py --skip-translate   # 跳过 AI 翻译
+python scripts/build_usda_data.py --skip-download     # 使用 data/ 中已有的 ZIP 文件
 ```
 
-> 该脚本目前为占位实现，需根据实际下载的数据格式适配。
+如需使用原有离线翻译模式（不需要 AI），可运行：
+
+```bash
+python scripts/merge_and_translate.py
+```
+
+> 该脚本使用内置的模式匹配词典翻译（约 95% 覆盖率），不需要 claude CLI。
+
+### 数据文件
+
+| 文件 | 说明 |
+| ---- | ---- |
+| `data/usda_nutrition.json` | 最终构建的数据库（~78 MB） |
+| `data/*.zip` | 缓存的 USDA 原始数据（构建后可删除） |
 
 ## 运行测试
 
@@ -119,7 +158,7 @@ pytest tests/ -v
 
 ## 项目结构
 
-```
+```text
 src/
 ├── models/          # 数据模型 (Recipe, Ingredient, Nutrition)
 ├── parsers/         # Markdown 解析器
@@ -136,7 +175,9 @@ src/
     ├── settings_dialog.py     # 配置对话框
     └── merge_dialog.py        # 食材合并对话框
 scripts/
-└── prepare_usda_data.py    # USDA 数据准备脚本
+├── prepare_usda_data.py         # USDA 数据提取脚本
+├── translate_food_descriptions.py  # 食物描述手动翻译
+└── merge_and_translate.py       # 合并 + 模式翻译
 data/                       # 离线数据目录 (git 忽略)
 ```
 

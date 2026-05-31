@@ -1,0 +1,1245 @@
+- generic [ref=e3]:
+  - link "Skip to main content" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner "Page Header" [ref=e6]:
+    - generic "Official United States Government Website Disclaimer" [ref=e9]:
+      - generic [ref=e10]:
+        - paragraph [ref=e11]: An official website of the United States government
+        - button "Here's how you know" [ref=e12] [cursor=pointer]
+    - generic [ref=e17]:
+      - link "The U.S. Department of Agriculture Home Page" [ref=e18] [cursor=pointer]:
+        - /url: https://www.usda.gov/
+        - text: U.S. Department of Agriculture
+      - link "The Agricultural Research Service Home Page" [ref=e19] [cursor=pointer]:
+        - /url: https://www.ars.usda.gov/
+        - text: Agricultural Research Service
+    - navigation "Navigation" [ref=e20]:
+      - generic [ref=e21]:
+        - navigation "Secondary" [ref=e23]:
+          - list [ref=e24]:
+            - listitem [ref=e25]:
+              - link "ARS Home" [ref=e26] [cursor=pointer]:
+                - /url: https://www.ars.usda.gov/
+            - listitem [ref=e27]:
+              - link "About ARS" [ref=e28] [cursor=pointer]:
+                - /url: https://www.ars.usda.gov/about-ars/
+            - listitem [ref=e29]:
+              - link "Contact ARS" [ref=e30] [cursor=pointer]:
+                - /url: https://www.ars.usda.gov/contact-us/?modeCode=00-00-00-00
+        - navigation "Main" [ref=e31]:
+          - list [ref=e32]:
+            - listitem [ref=e33]:
+              - link "Home" [ref=e34] [cursor=pointer]:
+                - /url: /
+            - listitem [ref=e35]:
+              - link "Search" [ref=e36] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e37]:
+              - link "Browse" [ref=e38] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e39]:
+              - link "Resources" [ref=e40] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e41]:
+              - link "Data" [ref=e42] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e43]:
+              - link "About Us" [ref=e44] [cursor=pointer]:
+                - /url: /about-us
+            - listitem [ref=e45]:
+              - link "Contact FoodData Central" [ref=e46] [cursor=pointer]:
+                - /url: /contact
+  - main [ref=e49]:
+    - heading "FoodData Central Download Datasets" [level=1] [ref=e50]
+    - navigation "Breadcrumb" [ref=e54]:
+      - list [ref=e55]:
+        - listitem [ref=e56]:
+          - link "ARS Home" [ref=e57] [cursor=pointer]:
+            - /url: https://www.ars.usda.gov/
+          - text: ›
+        - listitem [ref=e58]:
+          - link "FoodData Central" [ref=e59] [cursor=pointer]:
+            - /url: /
+          - text: ›
+        - listitem [ref=e60]: Download Datasets
+    - generic [ref=e62]:
+      - complementary [ref=e63]:
+        - search [ref=e66]:
+          - generic [ref=e67]: Food Search
+          - searchbox "Food Search" [ref=e68]
+          - button "Search" [ref=e69] [cursor=pointer]:
+            - generic [ref=e70]: Search
+        - navigation "Subnavigation" [ref=e71]:
+          - list [ref=e72]:
+            - listitem [ref=e73]:
+              - generic [ref=e74]:
+                - link [ref=e75] [cursor=pointer]:
+                  - /url: /download-datasets
+                  - text: Download Data
+                - list [ref=e76]:
+                  - listitem [ref=e77]:
+                    - link [ref=e78] [cursor=pointer]:
+                      - /url: /download-datasets#bkmk-1
+                      - text: Download FoodData Central Data
+                  - listitem [ref=e79]:
+                    - link [ref=e80] [cursor=pointer]:
+                      - /url: /download-datasets#bkmk-2
+                      - text: Access the Downloads
+                  - listitem [ref=e81]:
+                    - link [ref=e82] [cursor=pointer]:
+                      - /url: /download-datasets#bkmk-3
+                      - text: Notes for Downloading
+      - generic [ref=e83]:
+        - heading "Download FoodData Central Data" [level=2] [ref=e84]
+        - heading "Documentation" [level=2] [ref=e85]
+        - paragraph [ref=e86]: Data contained in FoodData Central can be downloaded. The download files are available both as an Excel-compatible CSV delimited ASCII file and in JavaScript Object Notation (JSON).
+        - paragraph [ref=e87]:
+          - text: View
+          - link "data type documentation" [ref=e88] [cursor=pointer]:
+            - /url: /data-documentation
+          - text: for each of FoodData Central's data types. Documentation for the JSON format can be found through our
+          - link "API guide on SwaggerHub" [ref=e89] [cursor=pointer]:
+            - /url: /api-guide
+          - text: .
+        - paragraph [ref=e90]:
+          - text: View Download Field Descriptions (
+          - link "PDF - 149K" [ref=e91] [cursor=pointer]:
+            - /url: /docs/Download_Field_Descriptions_Oct2020.pdf
+          - text: ) for definitions of all the terms and labels used in the download files of FoodData Central. This guide is also included in each downloaded file.
+        - heading "Latest Downloads" [level=2] [ref=e92]
+        - heading "Releases" [level=4] [ref=e93]
+        - table [ref=e97]:
+          - rowgroup [ref=e98]:
+            - row "Data Type Release Date Download File File Format Zipped Unzipped" [ref=e99]:
+              - columnheader "Data Type" [ref=e100]
+              - columnheader "Release Date" [ref=e101]
+              - columnheader "Download File" [ref=e102]
+              - columnheader "File Format" [ref=e103]
+              - columnheader "Zipped" [ref=e104]
+              - columnheader "Unzipped" [ref=e105]
+          - rowgroup [ref=e106]:
+            - row "Foundation Foods 04/2026 download iconApril 2026 (JSON) download iconApril 2026 (CSV) JSON CSV 459K 3.7M 6.5M 32M" [ref=e107]:
+              - cell "Foundation Foods" [ref=e108]
+              - cell "04/2026" [ref=e109]
+              - cell "download iconApril 2026 (JSON) download iconApril 2026 (CSV)" [ref=e110]:
+                - link "download iconApril 2026 (JSON)" [ref=e111] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_json_2026-04-30.zip
+                  - img "download icon" [ref=e112]
+                  - text: April 2026 (JSON)
+                - link "download iconApril 2026 (CSV)" [ref=e113] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2026-04-30.zip
+                  - img "download icon" [ref=e114]
+                  - text: April 2026 (CSV)
+              - cell "JSON CSV" [ref=e115]:
+                - text: JSON
+                - text: CSV
+              - cell "459K 3.7M" [ref=e116]:
+                - text: 459K
+                - text: 3.7M
+              - cell "6.5M 32M" [ref=e117]:
+                - text: 6.5M
+                - text: 32M
+            - row "SR Legacy 04/2018 download iconApril 2018 (JSON) download iconApril 2018 (CSV) JSON CSV 12.3M 6.7M 205M 54M" [ref=e118]:
+              - cell "SR Legacy" [ref=e119]
+              - cell "04/2018" [ref=e120]
+              - cell "download iconApril 2018 (JSON) download iconApril 2018 (CSV)" [ref=e121]:
+                - link "download iconApril 2018 (JSON)" [ref=e122] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_sr_legacy_food_json_2018-04.zip
+                  - img "download icon" [ref=e123]
+                  - text: April 2018 (JSON)
+                - link "download iconApril 2018 (CSV)" [ref=e124] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip
+                  - img "download icon" [ref=e125]
+                  - text: April 2018 (CSV)
+              - cell "JSON CSV" [ref=e126]:
+                - text: JSON
+                - text: CSV
+              - cell "12.3M 6.7M" [ref=e127]:
+                - text: 12.3M
+                - text: 6.7M
+              - cell "205M 54M" [ref=e128]:
+                - text: 205M
+                - text: 54M
+            - row "FNDDS 10/2024 download iconFNDDS 2021-2023 (JSON) download iconFNDDS 2021-2023 (CSV) JSON CSV 3.7M 200M 64M 1.6G" [ref=e129]:
+              - cell "FNDDS" [ref=e130]
+              - cell "10/2024" [ref=e131]
+              - cell "download iconFNDDS 2021-2023 (JSON) download iconFNDDS 2021-2023 (CSV)" [ref=e132]:
+                - link "download iconFNDDS 2021-2023 (JSON)" [ref=e133] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_survey_food_json_2024-10-31.zip
+                  - img "download icon" [ref=e134]
+                  - text: FNDDS 2021-2023 (JSON)
+                - link "download iconFNDDS 2021-2023 (CSV)" [ref=e135] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_survey_food_csv_2024-10-31.zip
+                  - img "download icon" [ref=e136]
+                  - text: FNDDS 2021-2023 (CSV)
+              - cell "JSON CSV" [ref=e137]:
+                - text: JSON
+                - text: CSV
+              - cell "3.7M 200M" [ref=e138]:
+                - text: 3.7M
+                - text: 200M
+              - cell "64M 1.6G" [ref=e139]:
+                - text: 64M
+                - text: 1.6G
+            - row "Branded 04/2026 download iconApril 2026 (JSON) download iconApril 2026 (CSV) JSON CSV 195M 428M 3.1G 2.9G" [ref=e140]:
+              - cell "Branded" [ref=e141]
+              - cell "04/2026" [ref=e142]
+              - cell "download iconApril 2026 (JSON) download iconApril 2026 (CSV)" [ref=e143]:
+                - link "download iconApril 2026 (JSON)" [ref=e144] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_json_2026-04-30.zip
+                  - img "download icon" [ref=e145]
+                  - text: April 2026 (JSON)
+                - link "download iconApril 2026 (CSV)" [ref=e146] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2026-04-30.zip
+                  - img "download icon" [ref=e147]
+                  - text: April 2026 (CSV)
+              - cell "JSON CSV" [ref=e148]:
+                - text: JSON
+                - text: CSV
+              - cell "195M 428M" [ref=e149]:
+                - text: 195M
+                - text: 428M
+              - cell "3.1G 2.9G" [ref=e150]:
+                - text: 3.1G
+                - text: 2.9G
+            - row "Full Download of All Data Types 04/2026 download iconApril 2026 (CSV) CSV 460M 3.1G" [ref=e151]:
+              - cell "Full Download of All Data Types" [ref=e152]
+              - cell "04/2026" [ref=e153]
+              - cell "download iconApril 2026 (CSV)" [ref=e154]:
+                - link "download iconApril 2026 (CSV)" [ref=e155] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2026-04-30.zip
+                  - img "download icon" [ref=e156]
+                  - text: April 2026 (CSV)
+              - cell "CSV" [ref=e157]
+              - cell "460M" [ref=e158]
+              - cell "3.1G" [ref=e159]
+        - heading "Historical Downloads" [level=2] [ref=e161]
+        - heading "Supporting Data" [level=4] [ref=e162]
+        - paragraph [ref=e163]: Starting in April 2023, all downloads now include the supporting data in every archive. The supporting data is only required for archives prior to the April 2023 release.
+        - table [ref=e167]:
+          - rowgroup [ref=e168]:
+            - row "Data Type Release Date Download File File Format Zipped Unzipped" [ref=e169]:
+              - columnheader "Data Type" [ref=e170]
+              - columnheader "Release Date" [ref=e171]
+              - columnheader "Download File" [ref=e172]
+              - columnheader "File Format" [ref=e173]
+              - columnheader "Zipped" [ref=e174]
+              - columnheader "Unzipped" [ref=e175]
+          - rowgroup [ref=e176]:
+            - row "Supporting Data 10/2022 download iconOctober 2022 (CSV) CSV 952K 16M" [ref=e177]:
+              - cell "Supporting Data" [ref=e178]
+              - cell "10/2022" [ref=e179]
+              - cell "download iconOctober 2022 (CSV)" [ref=e180]:
+                - link "download iconOctober 2022 (CSV)" [ref=e181] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_Supporting_Data_csv_2022-10-28.zip
+                  - img "download icon" [ref=e182]
+                  - text: October 2022 (CSV)
+              - cell "CSV" [ref=e183]
+              - cell "952K" [ref=e184]
+              - cell "16M" [ref=e185]
+            - row "Supporting Data 4/2022 download iconApril 2022 (CSV) CSV 1.1M 17.6M" [ref=e186]:
+              - cell "Supporting Data" [ref=e187]
+              - cell "4/2022" [ref=e188]
+              - cell "download iconApril 2022 (CSV)" [ref=e189]:
+                - link "download iconApril 2022 (CSV)" [ref=e190] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_Supporting_Data_csv_2022-04-28.zip
+                  - img "download icon" [ref=e191]
+                  - text: April 2022 (CSV)
+              - cell "CSV" [ref=e192]
+              - cell "1.1M" [ref=e193]
+              - cell "17.6M" [ref=e194]
+            - row "Supporting Data 10/2021 download iconOctober 2021 (CSV) CSV 1.1M 17.6M" [ref=e195]:
+              - cell "Supporting Data" [ref=e196]
+              - cell "10/2021" [ref=e197]
+              - cell "download iconOctober 2021 (CSV)" [ref=e198]:
+                - link "download iconOctober 2021 (CSV)" [ref=e199] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_Supporting_Data_csv_2021-10-28.zip
+                  - img "download icon" [ref=e200]
+                  - text: October 2021 (CSV)
+              - cell "CSV" [ref=e201]
+              - cell "1.1M" [ref=e202]
+              - cell "17.6M" [ref=e203]
+            - row "Supporting Data 4/2021 download iconApril 2021 (CSV) CSV 1.1M 17.6M" [ref=e204]:
+              - cell "Supporting Data" [ref=e205]
+              - cell "4/2021" [ref=e206]
+              - cell "download iconApril 2021 (CSV)" [ref=e207]:
+                - link "download iconApril 2021 (CSV)" [ref=e208] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_Supporting_Data_csv_2021-04-28.zip
+                  - img "download icon" [ref=e209]
+                  - text: April 2021 (CSV)
+              - cell "CSV" [ref=e210]
+              - cell "1.1M" [ref=e211]
+              - cell "17.6M" [ref=e212]
+            - row "Supporting Data 10/2020 download iconOctober 2020 (CSV) CSV 1.1M 17.6" [ref=e213]:
+              - cell "Supporting Data" [ref=e214]
+              - cell "10/2020" [ref=e215]
+              - cell "download iconOctober 2020 (CSV)" [ref=e216]:
+                - link "download iconOctober 2020 (CSV)" [ref=e217] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_Supporting_Data_csv_2020-10-30.zip
+                  - img "download icon" [ref=e218]
+                  - text: October 2020 (CSV)
+              - cell "CSV" [ref=e219]
+              - cell "1.1M" [ref=e220]
+              - cell "17.6" [ref=e221]
+            - row "Supporting Data 4/2020 download iconApril 2020 (CSV) CSV 1.8M 25M" [ref=e222]:
+              - cell "Supporting Data" [ref=e223]
+              - cell "4/2020" [ref=e224]
+              - cell "download iconApril 2020 (CSV)" [ref=e225]:
+                - link "download iconApril 2020 (CSV)" [ref=e226] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_Supporting_Data_csv_2020-04-29.zip
+                  - img "download icon" [ref=e227]
+                  - text: April 2020 (CSV)
+              - cell "CSV" [ref=e228]
+              - cell "1.8M" [ref=e229]
+              - cell "25M" [ref=e230]
+            - row "Supporting Data 12/2019 download iconDecember 2019 (CSV) CSV 210K 291K" [ref=e231]:
+              - cell "Supporting Data" [ref=e232]
+              - cell "12/2019" [ref=e233]
+              - cell "download iconDecember 2019 (CSV)" [ref=e234]:
+                - link "download iconDecember 2019 (CSV)" [ref=e235] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_Supporting_Data_csv_2019-12-17.zip
+                  - img "download icon" [ref=e236]
+                  - text: December 2019 (CSV)
+              - cell "CSV" [ref=e237]
+              - cell "210K" [ref=e238]
+              - cell "291K" [ref=e239]
+            - row "Supporting Data 4/2019 download iconApril 2019 (CSV) CSV 212K 548K" [ref=e240]:
+              - cell "Supporting Data" [ref=e241]
+              - cell "4/2019" [ref=e242]
+              - cell "download iconApril 2019 (CSV)" [ref=e243]:
+                - link "download iconApril 2019 (CSV)" [ref=e244] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_Supporting_Data_csv_%202019-04-02.zip
+                  - img "download icon" [ref=e245]
+                  - text: April 2019 (CSV)
+              - cell "CSV" [ref=e246]
+              - cell "212K" [ref=e247]
+              - cell "548K" [ref=e248]
+        - heading "Releases" [level=4] [ref=e250]
+        - table [ref=e254]:
+          - rowgroup [ref=e255]:
+            - row "Data Type Release Date Download File File Format Zipped Unzipped" [ref=e256]:
+              - columnheader "Data Type" [ref=e257]
+              - columnheader "Release Date" [ref=e258]
+              - columnheader "Download File" [ref=e259]
+              - columnheader "File Format" [ref=e260]
+              - columnheader "Zipped" [ref=e261]
+              - columnheader "Unzipped" [ref=e262]
+          - rowgroup [ref=e263]:
+            - row "Foundation Foods 12/2025 download iconDecember 2025 (JSON) download iconDecember 2025 (CSV) JSON CSV 467K 3.4M 6.5M 29M" [ref=e264]:
+              - cell "Foundation Foods" [ref=e265]
+              - cell "12/2025" [ref=e266]
+              - cell "download iconDecember 2025 (JSON) download iconDecember 2025 (CSV)" [ref=e267]:
+                - link "download iconDecember 2025 (JSON)" [ref=e268] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_json_2025-12-18.zip
+                  - img "download icon" [ref=e269]
+                  - text: December 2025 (JSON)
+                - link "download iconDecember 2025 (CSV)" [ref=e270] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2025-12-18.zip
+                  - img "download icon" [ref=e271]
+                  - text: December 2025 (CSV)
+              - cell "JSON CSV" [ref=e272]:
+                - text: JSON
+                - text: CSV
+              - cell "467K 3.4M" [ref=e273]:
+                - text: 467K
+                - text: 3.4M
+              - cell "6.5M 29M" [ref=e274]:
+                - text: 6.5M
+                - text: 29M
+            - row "Foundation Foods 04/2025 download iconApril 2025 (JSON) download iconApril 2025 (CSV) JSON CSV 452K 3.3M 6.3M 28M" [ref=e275]:
+              - cell "Foundation Foods" [ref=e276]
+              - cell "04/2025" [ref=e277]
+              - cell "download iconApril 2025 (JSON) download iconApril 2025 (CSV)" [ref=e278]:
+                - link "download iconApril 2025 (JSON)" [ref=e279] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_json_2025-04-24.zip
+                  - img "download icon" [ref=e280]
+                  - text: April 2025 (JSON)
+                - link "download iconApril 2025 (CSV)" [ref=e281] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2025-04-24.zip
+                  - img "download icon" [ref=e282]
+                  - text: April 2025 (CSV)
+              - cell "JSON CSV" [ref=e283]:
+                - text: JSON
+                - text: CSV
+              - cell "452K 3.3M" [ref=e284]:
+                - text: 452K
+                - text: 3.3M
+              - cell "6.3M 28M" [ref=e285]:
+                - text: 6.3M
+                - text: 28M
+            - row "Foundation Foods 10/2024 download iconOctober 2024 (JSON) download iconOctober 2024 (CSV) JSON CSV 416K 3.1M 6M 26M" [ref=e286]:
+              - cell "Foundation Foods" [ref=e287]
+              - cell "10/2024" [ref=e288]
+              - cell "download iconOctober 2024 (JSON) download iconOctober 2024 (CSV)" [ref=e289]:
+                - link "download iconOctober 2024 (JSON)" [ref=e290] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_json_2024-10-31.zip
+                  - img "download icon" [ref=e291]
+                  - text: October 2024 (JSON)
+                - link "download iconOctober 2024 (CSV)" [ref=e292] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2024-10-31.zip
+                  - img "download icon" [ref=e293]
+                  - text: October 2024 (CSV)
+              - cell "JSON CSV" [ref=e294]:
+                - text: JSON
+                - text: CSV
+              - cell "416K 3.1M" [ref=e295]:
+                - text: 416K
+                - text: 3.1M
+              - cell "6M 26M" [ref=e296]:
+                - text: 6M
+                - text: 26M
+            - row "Foundation Foods 04/2024 download iconApril 2024 (JSON) download iconApril 2024 (CSV) JSON CSV 416K 3.0M 5.7M 25M" [ref=e297]:
+              - cell "Foundation Foods" [ref=e298]
+              - cell "04/2024" [ref=e299]
+              - cell "download iconApril 2024 (JSON) download iconApril 2024 (CSV)" [ref=e300]:
+                - link "download iconApril 2024 (JSON)" [ref=e301] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_json_2024-04-18.zip
+                  - img "download icon" [ref=e302]
+                  - text: April 2024 (JSON)
+                - link "download iconApril 2024 (CSV)" [ref=e303] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2024-04-18.zip
+                  - img "download icon" [ref=e304]
+                  - text: April 2024 (CSV)
+              - cell "JSON CSV" [ref=e305]:
+                - text: JSON
+                - text: CSV
+              - cell "416K 3.0M" [ref=e306]:
+                - text: 416K
+                - text: 3.0M
+              - cell "5.7M 25M" [ref=e307]:
+                - text: 5.7M
+                - text: 25M
+            - row "Foundation Foods 10/2023 download iconOctober 2023 (JSON) download iconOctober 2023 (CSV) JSON CSV 409K 2.9M 5.5M 24M" [ref=e308]:
+              - cell "Foundation Foods" [ref=e309]
+              - cell "10/2023" [ref=e310]
+              - cell "download iconOctober 2023 (JSON) download iconOctober 2023 (CSV)" [ref=e311]:
+                - link "download iconOctober 2023 (JSON)" [ref=e312] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_json_2023-10-26.zip
+                  - img "download icon" [ref=e313]
+                  - text: October 2023 (JSON)
+                - link "download iconOctober 2023 (CSV)" [ref=e314] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2023-10-26.zip
+                  - img "download icon" [ref=e315]
+                  - text: October 2023 (CSV)
+              - cell "JSON CSV" [ref=e316]:
+                - text: JSON
+                - text: CSV
+              - cell "409K 2.9M" [ref=e317]:
+                - text: 409K
+                - text: 2.9M
+              - cell "5.5M 24M" [ref=e318]:
+                - text: 5.5M
+                - text: 24M
+            - row "Foundation Foods 4/2023 download iconApril 2023 (JSON) download iconApril 2023 (CSV) JSON CSV 391K 2.9M 5.2M 23M" [ref=e319]:
+              - cell "Foundation Foods" [ref=e320]
+              - cell "4/2023" [ref=e321]
+              - cell "download iconApril 2023 (JSON) download iconApril 2023 (CSV)" [ref=e322]:
+                - link "download iconApril 2023 (JSON)" [ref=e323] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_json_2023-04-20.zip
+                  - img "download icon" [ref=e324]
+                  - text: April 2023 (JSON)
+                - link "download iconApril 2023 (CSV)" [ref=e325] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2023-04-20.zip
+                  - img "download icon" [ref=e326]
+                  - text: April 2023 (CSV)
+              - cell "JSON CSV" [ref=e327]:
+                - text: JSON
+                - text: CSV
+              - cell "391K 2.9M" [ref=e328]:
+                - text: 391K
+                - text: 2.9M
+              - cell "5.2M 23M" [ref=e329]:
+                - text: 5.2M
+                - text: 23M
+            - row "Foundation Foods 10/2022 download iconOctober 2022 (JSON) download iconOctober 2022 (CSV) JSON CSV 356K 2.4M 5.1M 22.6M" [ref=e330]:
+              - cell "Foundation Foods" [ref=e331]
+              - cell "10/2022" [ref=e332]
+              - cell "download iconOctober 2022 (JSON) download iconOctober 2022 (CSV)" [ref=e333]:
+                - link "download iconOctober 2022 (JSON)" [ref=e334] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_json_2022-10-28.zip
+                  - img "download icon" [ref=e335]
+                  - text: October 2022 (JSON)
+                - link "download iconOctober 2022 (CSV)" [ref=e336] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2022-10-28.zip
+                  - img "download icon" [ref=e337]
+                  - text: October 2022 (CSV)
+              - cell "JSON CSV" [ref=e338]:
+                - text: JSON
+                - text: CSV
+              - cell "356K 2.4M" [ref=e339]:
+                - text: 356K
+                - text: 2.4M
+              - cell "5.1M 22.6M" [ref=e340]:
+                - text: 5.1M
+                - text: 22.6M
+            - row "Foundation Foods 4/2022 download iconApril 2022 (JSON) download iconApril 2022 (CSV) JSON CSV 356K 2.3M 5.1M 21M" [ref=e341]:
+              - cell "Foundation Foods" [ref=e342]
+              - cell "4/2022" [ref=e343]
+              - cell "download iconApril 2022 (JSON) download iconApril 2022 (CSV)" [ref=e344]:
+                - link "download iconApril 2022 (JSON)" [ref=e345] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_json_2022-04-28.zip
+                  - img "download icon" [ref=e346]
+                  - text: April 2022 (JSON)
+                - link "download iconApril 2022 (CSV)" [ref=e347] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2022-04-28.zip
+                  - img "download icon" [ref=e348]
+                  - text: April 2022 (CSV)
+              - cell "JSON CSV" [ref=e349]:
+                - text: JSON
+                - text: CSV
+              - cell "356K 2.3M" [ref=e350]:
+                - text: 356K
+                - text: 2.3M
+              - cell "5.1M 21M" [ref=e351]:
+                - text: 5.1M
+                - text: 21M
+            - row "Foundation Foods 10/2021 download iconOctober 2021 (JSON) download iconOctober 2021 (CSV) JSON CSV 317K 2.1M 4.3M 19M" [ref=e352]:
+              - cell "Foundation Foods" [ref=e353]
+              - cell "10/2021" [ref=e354]
+              - cell "download iconOctober 2021 (JSON) download iconOctober 2021 (CSV)" [ref=e355]:
+                - link "download iconOctober 2021 (JSON)" [ref=e356] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_json_2021-10-28.zip
+                  - img "download icon" [ref=e357]
+                  - text: October 2021 (JSON)
+                - link "download iconOctober 2021 (CSV)" [ref=e358] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2021-10-28.zip
+                  - img "download icon" [ref=e359]
+                  - text: October 2021 (CSV)
+              - cell "JSON CSV" [ref=e360]:
+                - text: JSON
+                - text: CSV
+              - cell "317K 2.1M" [ref=e361]:
+                - text: 317K
+                - text: 2.1M
+              - cell "4.3M 19M" [ref=e362]:
+                - text: 4.3M
+                - text: 19M
+            - row "Foundation Foods 4/2021 download iconApril 2021 (CSV) CSV 1.8M 16M" [ref=e363]:
+              - cell "Foundation Foods" [ref=e364]
+              - cell "4/2021" [ref=e365]
+              - cell "download iconApril 2021 (CSV)" [ref=e366]:
+                - link "download iconApril 2021 (CSV)" [ref=e367] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2021-04-28.zip
+                  - img "download icon" [ref=e368]
+                  - text: April 2021 (CSV)
+              - cell "CSV" [ref=e369]
+              - cell "1.8M" [ref=e370]
+              - cell "16M" [ref=e371]
+            - row "Foundation Foods 10/2020 download iconOctober 2020 (CSV) CSV 1.9M 14M" [ref=e372]:
+              - cell "Foundation Foods" [ref=e373]
+              - cell "10/2020" [ref=e374]
+              - cell "download iconOctober 2020 (CSV)" [ref=e375]:
+                - link "download iconOctober 2020 (CSV)" [ref=e376] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2020-10-30.zip
+                  - img "download icon" [ref=e377]
+                  - text: October 2020 (CSV)
+              - cell "CSV" [ref=e378]
+              - cell "1.9M" [ref=e379]
+              - cell "14M" [ref=e380]
+            - row "Foundation Foods 4/2020 download iconApril 2020 (CSV) CSV 2.3M 14.2M" [ref=e381]:
+              - cell "Foundation Foods" [ref=e382]
+              - cell "4/2020" [ref=e383]
+              - cell "download iconApril 2020 (CSV)" [ref=e384]:
+                - link "download iconApril 2020 (CSV)" [ref=e385] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2020-04-29.zip
+                  - img "download icon" [ref=e386]
+                  - text: April 2020 (CSV)
+              - cell "CSV" [ref=e387]
+              - cell "2.3M" [ref=e388]
+              - cell "14.2M" [ref=e389]
+            - row "Foundation Foods 12/2019 download iconDecember 2019 (CSV) CSV 1.8M 13.2M" [ref=e390]:
+              - cell "Foundation Foods" [ref=e391]
+              - cell "12/2019" [ref=e392]
+              - cell "download iconDecember 2019 (CSV)" [ref=e393]:
+                - link "download iconDecember 2019 (CSV)" [ref=e394] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_2019-12-17.zip
+                  - img "download icon" [ref=e395]
+                  - text: December 2019 (CSV)
+              - cell "CSV" [ref=e396]
+              - cell "1.8M" [ref=e397]
+              - cell "13.2M" [ref=e398]
+            - row "Foundation Foods 4/2019 download iconApril 2019 (CSV) CSV 1.5M 10.5M" [ref=e399]:
+              - cell "Foundation Foods" [ref=e400]
+              - cell "4/2019" [ref=e401]
+              - cell "download iconApril 2019 (CSV)" [ref=e402]:
+                - link "download iconApril 2019 (CSV)" [ref=e403] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_foundation_food_csv_%202019-04-02.zip
+                  - img "download icon" [ref=e404]
+                  - text: April 2019 (CSV)
+              - cell "CSV" [ref=e405]
+              - cell "1.5M" [ref=e406]
+              - cell "10.5M" [ref=e407]
+            - row "FNDDS 10/2024 download iconFNDDS 2021-2023 (JSON) download iconFNDDS 2021-2023 (CSV) JSON CSV 3.7M 200M 64M 1.6G" [ref=e408]:
+              - cell "FNDDS" [ref=e409]
+              - cell "10/2024" [ref=e410]
+              - cell "download iconFNDDS 2021-2023 (JSON) download iconFNDDS 2021-2023 (CSV)" [ref=e411]:
+                - link "download iconFNDDS 2021-2023 (JSON)" [ref=e412] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_survey_food_json_2024-10-31.zip
+                  - img "download icon" [ref=e413]
+                  - text: FNDDS 2021-2023 (JSON)
+                - link "download iconFNDDS 2021-2023 (CSV)" [ref=e414] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_survey_food_csv_2024-10-31.zip
+                  - img "download icon" [ref=e415]
+                  - text: FNDDS 2021-2023 (CSV)
+              - cell "JSON CSV" [ref=e416]:
+                - text: JSON
+                - text: CSV
+              - cell "3.7M 200M" [ref=e417]:
+                - text: 3.7M
+                - text: 200M
+              - cell "64M 1.6G" [ref=e418]:
+                - text: 64M
+                - text: 1.6G
+            - row "FNDDS 10/2022 download iconFNDDS 2019-2020 (JSON) download iconFNDDS 2019-2020 (CSV) JSON CSV 3.8M 4.3M 66.8M 41M" [ref=e419]:
+              - cell "FNDDS" [ref=e420]
+              - cell "10/2022" [ref=e421]
+              - cell "download iconFNDDS 2019-2020 (JSON) download iconFNDDS 2019-2020 (CSV)" [ref=e422]:
+                - link "download iconFNDDS 2019-2020 (JSON)" [ref=e423] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_survey_food_json_2022-10-28.zip
+                  - img "download icon" [ref=e424]
+                  - text: FNDDS 2019-2020 (JSON)
+                - link "download iconFNDDS 2019-2020 (CSV)" [ref=e425] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_survey_food_csv_2022-10-28.zip
+                  - img "download icon" [ref=e426]
+                  - text: FNDDS 2019-2020 (CSV)
+              - cell "JSON CSV" [ref=e427]:
+                - text: JSON
+                - text: CSV
+              - cell "3.8M 4.3M" [ref=e428]:
+                - text: 3.8M
+                - text: 4.3M
+              - cell "66.8M 41M" [ref=e429]:
+                - text: 66.8M
+                - text: 41M
+            - row "FNDDS 10/2021 download iconFNDDS 2017-2018 (JSON) download iconFNDDS 2017-2018 (CSV) JSON CSV 4.2M 5M 84.3M 54M" [ref=e430]:
+              - cell "FNDDS" [ref=e431]
+              - cell "10/2021" [ref=e432]
+              - cell "download iconFNDDS 2017-2018 (JSON) download iconFNDDS 2017-2018 (CSV)" [ref=e433]:
+                - link "download iconFNDDS 2017-2018 (JSON)" [ref=e434] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_survey_food_json_2021-10-28.zip
+                  - img "download icon" [ref=e435]
+                  - text: FNDDS 2017-2018 (JSON)
+                - link "download iconFNDDS 2017-2018 (CSV)" [ref=e436] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_survey_food_csv_2020-10-30.zip
+                  - img "download icon" [ref=e437]
+                  - text: FNDDS 2017-2018 (CSV)
+              - cell "JSON CSV" [ref=e438]:
+                - text: JSON
+                - text: CSV
+              - cell "4.2M 5M" [ref=e439]:
+                - text: 4.2M
+                - text: 5M
+              - cell "84.3M 54M" [ref=e440]:
+                - text: 84.3M
+                - text: 54M
+            - row "FNDDS 4/2020 download iconFNDDS 2015-2016 (CSV) CSV 5M 41M" [ref=e441]:
+              - cell "FNDDS" [ref=e442]
+              - cell "4/2020" [ref=e443]
+              - cell "download iconFNDDS 2015-2016 (CSV)" [ref=e444]:
+                - link "download iconFNDDS 2015-2016 (CSV)" [ref=e445] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_survey_food_csv_2020-03-31.zip
+                  - img "download icon" [ref=e446]
+                  - text: FNDDS 2015-2016 (CSV)
+              - cell "CSV" [ref=e447]
+              - cell "5M" [ref=e448]
+              - cell "41M" [ref=e449]
+            - row "FNDDS 4/2019 download iconFNDDS 2013-2014 (CSV) CSV 5M 39M" [ref=e450]:
+              - cell "FNDDS" [ref=e451]
+              - cell "4/2019" [ref=e452]
+              - cell "download iconFNDDS 2013-2014 (CSV)" [ref=e453]:
+                - link "download iconFNDDS 2013-2014 (CSV)" [ref=e454] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_survey_food_csv_%202019-04-02.zip
+                  - img "download icon" [ref=e455]
+                  - text: FNDDS 2013-2014 (CSV)
+              - cell "CSV" [ref=e456]
+              - cell "5M" [ref=e457]
+              - cell "39M" [ref=e458]
+            - row "Branded 12/2025 download iconDecember 2025 (JSON) download iconDecember 2025 (CSV) JSON CSV 195M 427M 3.1G 2.9G" [ref=e459]:
+              - cell "Branded" [ref=e460]
+              - cell "12/2025" [ref=e461]
+              - cell "download iconDecember 2025 (JSON) download iconDecember 2025 (CSV)" [ref=e462]:
+                - link "download iconDecember 2025 (JSON)" [ref=e463] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_json_2025-12-18.zip
+                  - img "download icon" [ref=e464]
+                  - text: December 2025 (JSON)
+                - link "download iconDecember 2025 (CSV)" [ref=e465] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2025-12-18.zip
+                  - img "download icon" [ref=e466]
+                  - text: December 2025 (CSV)
+              - cell "JSON CSV" [ref=e467]:
+                - text: JSON
+                - text: CSV
+              - cell "195M 427M" [ref=e468]:
+                - text: 195M
+                - text: 427M
+              - cell "3.1G 2.9G" [ref=e469]:
+                - text: 3.1G
+                - text: 2.9G
+            - row "Branded 04/2025 download iconApril 2025 (JSON) download iconApril 2025 (CSV) JSON CSV 195M 423M 3.1G 2.9G" [ref=e470]:
+              - cell "Branded" [ref=e471]
+              - cell "04/2025" [ref=e472]
+              - cell "download iconApril 2025 (JSON) download iconApril 2025 (CSV)" [ref=e473]:
+                - link "download iconApril 2025 (JSON)" [ref=e474] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_json_2025-04-24.zip
+                  - img "download icon" [ref=e475]
+                  - text: April 2025 (JSON)
+                - link "download iconApril 2025 (CSV)" [ref=e476] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2025-04-24.zip
+                  - img "download icon" [ref=e477]
+                  - text: April 2025 (CSV)
+              - cell "JSON CSV" [ref=e478]:
+                - text: JSON
+                - text: CSV
+              - cell "195M 423M" [ref=e479]:
+                - text: 195M
+                - text: 423M
+              - cell "3.1G 2.9G" [ref=e480]:
+                - text: 3.1G
+                - text: 2.9G
+            - row "Branded 10/2024 download iconOctober 2024 (JSON) download iconOctober 2024 (CSV) JSON CSV 195M 420M 3.1G 2.9G" [ref=e481]:
+              - cell "Branded" [ref=e482]
+              - cell "10/2024" [ref=e483]
+              - cell "download iconOctober 2024 (JSON) download iconOctober 2024 (CSV)" [ref=e484]:
+                - link "download iconOctober 2024 (JSON)" [ref=e485] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_json_2024-10-31.zip
+                  - img "download icon" [ref=e486]
+                  - text: October 2024 (JSON)
+                - link "download iconOctober 2024 (CSV)" [ref=e487] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2024-10-31.zip
+                  - img "download icon" [ref=e488]
+                  - text: October 2024 (CSV)
+              - cell "JSON CSV" [ref=e489]:
+                - text: JSON
+                - text: CSV
+              - cell "195M 420M" [ref=e490]:
+                - text: 195M
+                - text: 420M
+              - cell "3.1G 2.9G" [ref=e491]:
+                - text: 3.1G
+                - text: 2.9G
+            - row "Branded 04/2024 download iconApril 2024 (JSON) download iconApril 2024 (CSV) JSON CSV 176M 415M 3.1G 2.8G" [ref=e492]:
+              - cell "Branded" [ref=e493]
+              - cell "04/2024" [ref=e494]
+              - cell "download iconApril 2024 (JSON) download iconApril 2024 (CSV)" [ref=e495]:
+                - link "download iconApril 2024 (JSON)" [ref=e496] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_json_2024-04-18.zip
+                  - img "download icon" [ref=e497]
+                  - text: April 2024 (JSON)
+                - link "download iconApril 2024 (CSV)" [ref=e498] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2024-04-18.zip
+                  - img "download icon" [ref=e499]
+                  - text: April 2024 (CSV)
+              - cell "JSON CSV" [ref=e500]:
+                - text: JSON
+                - text: CSV
+              - cell "176M 415M" [ref=e501]:
+                - text: 176M
+                - text: 415M
+              - cell "3.1G 2.8G" [ref=e502]:
+                - text: 3.1G
+                - text: 2.8G
+            - row "Branded 10/2023 download iconOctober 2023 (JSON) download iconOctober 2023 (CSV) JSON CSV 176M 439M 3.1G 3.1G" [ref=e503]:
+              - cell "Branded" [ref=e504]
+              - cell "10/2023" [ref=e505]
+              - cell "download iconOctober 2023 (JSON) download iconOctober 2023 (CSV)" [ref=e506]:
+                - link "download iconOctober 2023 (JSON)" [ref=e507] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_json_2023-10-26.zip
+                  - img "download icon" [ref=e508]
+                  - text: October 2023 (JSON)
+                - link "download iconOctober 2023 (CSV)" [ref=e509] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2023-10-26.zip
+                  - img "download icon" [ref=e510]
+                  - text: October 2023 (CSV)
+              - cell "JSON CSV" [ref=e511]:
+                - text: JSON
+                - text: CSV
+              - cell "176M 439M" [ref=e512]:
+                - text: 176M
+                - text: 439M
+              - cell "3.1G 3.1G" [ref=e513]:
+                - text: 3.1G
+                - text: 3.1G
+            - row "Branded 4/2023 download iconApril 2023 (JSON) download iconApril 2023 (CSV) JSON CSV 176M 377M 2.8G 2.4G" [ref=e514]:
+              - cell "Branded" [ref=e515]
+              - cell "4/2023" [ref=e516]
+              - cell "download iconApril 2023 (JSON) download iconApril 2023 (CSV)" [ref=e517]:
+                - link "download iconApril 2023 (JSON)" [ref=e518] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_json_2023-04-20.zip
+                  - img "download icon" [ref=e519]
+                  - text: April 2023 (JSON)
+                - link "download iconApril 2023 (CSV)" [ref=e520] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2023-04-20.zip
+                  - img "download icon" [ref=e521]
+                  - text: April 2023 (CSV)
+              - cell "JSON CSV" [ref=e522]:
+                - text: JSON
+                - text: CSV
+              - cell "176M 377M" [ref=e523]:
+                - text: 176M
+                - text: 377M
+              - cell "2.8G 2.4G" [ref=e524]:
+                - text: 2.8G
+                - text: 2.4G
+            - row "Branded 10/2022 download iconOctober 2022 (JSON) download iconOctober 2022 (CSV) JSON CSV 164M 342M 2.7G 480M" [ref=e525]:
+              - cell "Branded" [ref=e526]
+              - cell "10/2022" [ref=e527]
+              - cell "download iconOctober 2022 (JSON) download iconOctober 2022 (CSV)" [ref=e528]:
+                - link "download iconOctober 2022 (JSON)" [ref=e529] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_json_2022-10-28.zip
+                  - img "download icon" [ref=e530]
+                  - text: October 2022 (JSON)
+                - link "download iconOctober 2022 (CSV)" [ref=e531] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2022-10-28.zip
+                  - img "download icon" [ref=e532]
+                  - text: October 2022 (CSV)
+              - cell "JSON CSV" [ref=e533]:
+                - text: JSON
+                - text: CSV
+              - cell "164M 342M" [ref=e534]:
+                - text: 164M
+                - text: 342M
+              - cell "2.7G 480M" [ref=e535]:
+                - text: 2.7G
+                - text: 480M
+            - row "Branded 4/2022 download iconApril 2022 (JSON) download iconApril 2022 (CSV) JSON CSV 163M 329M 2.6G 1.2G" [ref=e536]:
+              - cell "Branded" [ref=e537]
+              - cell "4/2022" [ref=e538]
+              - cell "download iconApril 2022 (JSON) download iconApril 2022 (CSV)" [ref=e539]:
+                - link "download iconApril 2022 (JSON)" [ref=e540] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_json_2022-04-28.zip
+                  - img "download icon" [ref=e541]
+                  - text: April 2022 (JSON)
+                - link "download iconApril 2022 (CSV)" [ref=e542] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2022-04-28.zip
+                  - img "download icon" [ref=e543]
+                  - text: April 2022 (CSV)
+              - cell "JSON CSV" [ref=e544]:
+                - text: JSON
+                - text: CSV
+              - cell "163M 329M" [ref=e545]:
+                - text: 163M
+                - text: 329M
+              - cell "2.6G 1.2G" [ref=e546]:
+                - text: 2.6G
+                - text: 1.2G
+            - row "Branded 10/2021 download iconOctober 2021 (JSON) download iconOctober 2021 (CSV) JSON CSV 157M 313M 2.6G 2.2G" [ref=e547]:
+              - cell "Branded" [ref=e548]
+              - cell "10/2021" [ref=e549]
+              - cell "download iconOctober 2021 (JSON) download iconOctober 2021 (CSV)" [ref=e550]:
+                - link "download iconOctober 2021 (JSON)" [ref=e551] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_json_2021-10-28.zip
+                  - img "download icon" [ref=e552]
+                  - text: October 2021 (JSON)
+                - link "download iconOctober 2021 (CSV)" [ref=e553] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2021-10-28.zip
+                  - img "download icon" [ref=e554]
+                  - text: October 2021 (CSV)
+              - cell "JSON CSV" [ref=e555]:
+                - text: JSON
+                - text: CSV
+              - cell "157M 313M" [ref=e556]:
+                - text: 157M
+                - text: 313M
+              - cell "2.6G 2.2G" [ref=e557]:
+                - text: 2.6G
+                - text: 2.2G
+            - row "Branded 4/2021 download iconApril 2021 (CSV) CSV 221M 1.5G" [ref=e558]:
+              - cell "Branded" [ref=e559]
+              - cell "4/2021" [ref=e560]
+              - cell "download iconApril 2021 (CSV)" [ref=e561]:
+                - link "download iconApril 2021 (CSV)" [ref=e562] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2021-04-28.zip
+                  - img "download icon" [ref=e563]
+                  - text: April 2021 (CSV)
+              - cell "CSV" [ref=e564]
+              - cell "221M" [ref=e565]
+              - cell "1.5G" [ref=e566]
+            - row "Branded 10/2020 download iconOctober 2020 (CSV) CSV 95M 663M" [ref=e567]:
+              - cell "Branded" [ref=e568]
+              - cell "10/2020" [ref=e569]
+              - cell "download iconOctober 2020 (CSV)" [ref=e570]:
+                - link "download iconOctober 2020 (CSV)" [ref=e571] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2020-10-30.zip
+                  - img "download icon" [ref=e572]
+                  - text: October 2020 (CSV)
+              - cell "CSV" [ref=e573]
+              - cell "95M" [ref=e574]
+              - cell "663M" [ref=e575]
+            - row "Branded 4/2020 download iconApril 2020 version 2* (CSV) CSV 70M 487M" [ref=e576]:
+              - cell "Branded" [ref=e577]
+              - cell "4/2020" [ref=e578]
+              - cell "download iconApril 2020 version 2* (CSV)" [ref=e579]:
+                - link "download iconApril 2020 version 2* (CSV)" [ref=e580] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2020-04-29.zip
+                  - img "download icon" [ref=e581]
+                  - text: April 2020 version 2* (CSV)
+              - cell "CSV" [ref=e582]
+              - cell "70M" [ref=e583]
+              - cell "487M" [ref=e584]
+            - row "Branded 12/2019 download iconDecember 2019 (CSV) CSV 68M 430M" [ref=e585]:
+              - cell "Branded" [ref=e586]
+              - cell "12/2019" [ref=e587]
+              - cell "download iconDecember 2019 (CSV)" [ref=e588]:
+                - link "download iconDecember 2019 (CSV)" [ref=e589] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_2019-12-17.zip
+                  - img "download icon" [ref=e590]
+                  - text: December 2019 (CSV)
+              - cell "CSV" [ref=e591]
+              - cell "68M" [ref=e592]
+              - cell "430M" [ref=e593]
+            - row "Branded 4/2019 download iconApril 2019 (CSV) CSV 52M 327.5M" [ref=e594]:
+              - cell "Branded" [ref=e595]
+              - cell "4/2019" [ref=e596]
+              - cell "download iconApril 2019 (CSV)" [ref=e597]:
+                - link "download iconApril 2019 (CSV)" [ref=e598] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_branded_food_csv_%202019-04-02.zip
+                  - img "download icon" [ref=e599]
+                  - text: April 2019 (CSV)
+              - cell "CSV" [ref=e600]
+              - cell "52M" [ref=e601]
+              - cell "327.5M" [ref=e602]
+            - row "Branded (Before the Launch of FoodData Central) 7/2018 download iconJuly 2018 (CSV) download iconJuly 2018 (MS Access) CSV MS Access 38M 79M 272M 516M" [ref=e603]:
+              - cell "Branded (Before the Launch of FoodData Central)" [ref=e604]:
+                - text: Branded
+                - text: (Before the Launch of FoodData Central)
+              - cell "7/2018" [ref=e605]
+              - cell "download iconJuly 2018 (CSV) download iconJuly 2018 (MS Access)" [ref=e606]:
+                - link "download iconJuly 2018 (CSV)" [ref=e607] [cursor=pointer]:
+                  - /url: /fdc-datasets/BFPD_csv_07132018.zip
+                  - img "download icon" [ref=e608]
+                  - text: July 2018 (CSV)
+                - link "download iconJuly 2018 (MS Access)" [ref=e609] [cursor=pointer]:
+                  - /url: /fdc-datasets/BFPD_db_07132018.zip
+                  - img "download icon" [ref=e610]
+                  - text: July 2018 (MS Access)
+              - cell "CSV MS Access" [ref=e611]:
+                - text: CSV
+                - text: MS Access
+              - cell "38M 79M" [ref=e612]:
+                - text: 38M
+                - text: 79M
+              - cell "272M 516M" [ref=e613]:
+                - text: 272M
+                - text: 516M
+            - row "Full Download of All Data Types 12/2025 download iconDecember 2025 (CSV) CSV 458M 3.1G" [ref=e614]:
+              - cell "Full Download of All Data Types" [ref=e615]
+              - cell "12/2025" [ref=e616]
+              - cell "download iconDecember 2025 (CSV)" [ref=e617]:
+                - link "download iconDecember 2025 (CSV)" [ref=e618] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2025-12-18.zip
+                  - img "download icon" [ref=e619]
+                  - text: December 2025 (CSV)
+              - cell "CSV" [ref=e620]
+              - cell "458M" [ref=e621]
+              - cell "3.1G" [ref=e622]
+            - row "Full Download of All Data Types 04/2025 download iconApril 2025 (CSV) CSV 453M 3.0G" [ref=e623]:
+              - cell "Full Download of All Data Types" [ref=e624]
+              - cell "04/2025" [ref=e625]
+              - cell "download iconApril 2025 (CSV)" [ref=e626]:
+                - link "download iconApril 2025 (CSV)" [ref=e627] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2025-04-24.zip
+                  - img "download icon" [ref=e628]
+                  - text: April 2025 (CSV)
+              - cell "CSV" [ref=e629]
+              - cell "453M" [ref=e630]
+              - cell "3.0G" [ref=e631]
+            - row "Full Download of All Data Types 10/2024 download iconOctober 2024 (CSV) CSV 449M 3.0G" [ref=e632]:
+              - cell "Full Download of All Data Types" [ref=e633]
+              - cell "10/2024" [ref=e634]
+              - cell "download iconOctober 2024 (CSV)" [ref=e635]:
+                - link "download iconOctober 2024 (CSV)" [ref=e636] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2024-10-31.zip
+                  - img "download icon" [ref=e637]
+                  - text: October 2024 (CSV)
+              - cell "CSV" [ref=e638]
+              - cell "449M" [ref=e639]
+              - cell "3.0G" [ref=e640]
+            - row "Full Download of All Data Types 04/2024 download iconApril 2024 (CSV) CSV 440M 2.9G" [ref=e641]:
+              - cell "Full Download of All Data Types" [ref=e642]
+              - cell "04/2024" [ref=e643]
+              - cell "download iconApril 2024 (CSV)" [ref=e644]:
+                - link "download iconApril 2024 (CSV)" [ref=e645] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2024-04-18.zip
+                  - img "download icon" [ref=e646]
+                  - text: April 2024 (CSV)
+              - cell "CSV" [ref=e647]
+              - cell "440M" [ref=e648]
+              - cell "2.9G" [ref=e649]
+            - row "Full Download of All Data Types 10/2023 download iconOctober 2023 (CSV) CSV 417M 2.8G" [ref=e650]:
+              - cell "Full Download of All Data Types" [ref=e651]
+              - cell "10/2023" [ref=e652]
+              - cell "download iconOctober 2023 (CSV)" [ref=e653]:
+                - link "download iconOctober 2023 (CSV)" [ref=e654] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2023-10-26.zip
+                  - img "download icon" [ref=e655]
+                  - text: October 2023 (CSV)
+              - cell "CSV" [ref=e656]
+              - cell "417M" [ref=e657]
+              - cell "2.8G" [ref=e658]
+            - row "Full Download of All Data Types 4/2023 download iconApril 2023 (CSV) CSV 387M 2.6G" [ref=e659]:
+              - cell "Full Download of All Data Types" [ref=e660]
+              - cell "4/2023" [ref=e661]
+              - cell "download iconApril 2023 (CSV)" [ref=e662]:
+                - link "download iconApril 2023 (CSV)" [ref=e663] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2023-04-20.zip
+                  - img "download icon" [ref=e664]
+                  - text: April 2023 (CSV)
+              - cell "CSV" [ref=e665]
+              - cell "387M" [ref=e666]
+              - cell "2.6G" [ref=e667]
+            - row "Full Download of All Data Types 10/2022 download iconOctober 2022 (CSV) CSV 377M 1.7G" [ref=e668]:
+              - cell "Full Download of All Data Types" [ref=e669]
+              - cell "10/2022" [ref=e670]
+              - cell "download iconOctober 2022 (CSV)" [ref=e671]:
+                - link "download iconOctober 2022 (CSV)" [ref=e672] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2022-10-28.zip
+                  - img "download icon" [ref=e673]
+                  - text: October 2022 (CSV)
+              - cell "CSV" [ref=e674]
+              - cell "377M" [ref=e675]
+              - cell "1.7G" [ref=e676]
+            - row "Full Download of All Data Types 4/2022 download iconApril 2022 (CSV) CSV 342M 2.1G" [ref=e677]:
+              - cell "Full Download of All Data Types" [ref=e678]
+              - cell "4/2022" [ref=e679]
+              - cell "download iconApril 2022 (CSV)" [ref=e680]:
+                - link "download iconApril 2022 (CSV)" [ref=e681] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2022-04-28.zip
+                  - img "download icon" [ref=e682]
+                  - text: April 2022 (CSV)
+              - cell "CSV" [ref=e683]
+              - cell "342M" [ref=e684]
+              - cell "2.1G" [ref=e685]
+            - row "Full Download of All Data Types 10/2021 download iconOctober 2021 (CSV) download iconOctober 2021 (MS Access) CSV MS Access 318M 101M 2.4G 1.1G" [ref=e686]:
+              - cell "Full Download of All Data Types" [ref=e687]
+              - cell "10/2021" [ref=e688]
+              - cell "download iconOctober 2021 (CSV) download iconOctober 2021 (MS Access)" [ref=e689]:
+                - link "download iconOctober 2021 (CSV)" [ref=e690] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2021-10-28.zip
+                  - img "download icon" [ref=e691]
+                  - text: October 2021 (CSV)
+                - link "download iconOctober 2021 (MS Access)" [ref=e692] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_access_2021-10-28.zip
+                  - img "download icon" [ref=e693]
+                  - text: October 2021 (MS Access)
+              - cell "CSV MS Access" [ref=e694]:
+                - text: CSV
+                - text: MS Access
+              - cell "318M 101M" [ref=e695]:
+                - text: 318M
+                - text: 101M
+              - cell "2.4G 1.1G" [ref=e696]:
+                - text: 2.4G
+                - text: 1.1G
+            - row "Full Download of All Data Types 4/2021 download iconApril 2021 (CSV) download iconApril 2021 (MS Access) CSV MS Access 224M 160M 1.7G 920M" [ref=e697]:
+              - cell "Full Download of All Data Types" [ref=e698]
+              - cell "4/2021" [ref=e699]
+              - cell "download iconApril 2021 (CSV) download iconApril 2021 (MS Access)" [ref=e700]:
+                - link "download iconApril 2021 (CSV)" [ref=e701] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2021-04-28.zip
+                  - img "download icon" [ref=e702]
+                  - text: April 2021 (CSV)
+                - link "download iconApril 2021 (MS Access)" [ref=e703] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_access_2021-04-28.zip
+                  - img "download icon" [ref=e704]
+                  - text: April 2021 (MS Access)
+              - cell "CSV MS Access" [ref=e705]:
+                - text: CSV
+                - text: MS Access
+              - cell "224M 160M" [ref=e706]:
+                - text: 224M
+                - text: 160M
+              - cell "1.7G 920M" [ref=e707]:
+                - text: 1.7G
+                - text: 920M
+            - row "Full Download of All Data Types 10/2020 download iconOctober 2020 (CSV) download iconOctober 2020 (MS Access) CSV MS Access 102M 269M 766M 1.7G" [ref=e708]:
+              - cell "Full Download of All Data Types" [ref=e709]
+              - cell "10/2020" [ref=e710]
+              - cell "download iconOctober 2020 (CSV) download iconOctober 2020 (MS Access)" [ref=e711]:
+                - link "download iconOctober 2020 (CSV)" [ref=e712] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2020-10-30.zip
+                  - img "download icon" [ref=e713]
+                  - text: October 2020 (CSV)
+                - link "download iconOctober 2020 (MS Access)" [ref=e714] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_access_2020-10-30.zip
+                  - img "download icon" [ref=e715]
+                  - text: October 2020 (MS Access)
+              - cell "CSV MS Access" [ref=e716]:
+                - text: CSV
+                - text: MS Access
+              - cell "102M 269M" [ref=e717]:
+                - text: 102M
+                - text: 269M
+              - cell "766M 1.7G" [ref=e718]:
+                - text: 766M
+                - text: 1.7G
+            - row "Full Download of All Data Types 4/2020 download iconApril 2020 version 2* (CSV) download iconApril 2020 version 2* (MS Access) CSV MS Access 83M 151M 620M 902M" [ref=e719]:
+              - cell "Full Download of All Data Types" [ref=e720]
+              - cell "4/2020" [ref=e721]
+              - cell "download iconApril 2020 version 2* (CSV) download iconApril 2020 version 2* (MS Access)" [ref=e722]:
+                - link "download iconApril 2020 version 2* (CSV)" [ref=e723] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2020-04-29.zip
+                  - img "download icon" [ref=e724]
+                  - text: April 2020 version 2* (CSV)
+                - link "download iconApril 2020 version 2* (MS Access)" [ref=e725] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_access_2020-04-29.zip
+                  - img "download icon" [ref=e726]
+                  - text: April 2020 version 2* (MS Access)
+              - cell "CSV MS Access" [ref=e727]:
+                - text: CSV
+                - text: MS Access
+              - cell "83M 151M" [ref=e728]:
+                - text: 83M
+                - text: 151M
+              - cell "620M 902M" [ref=e729]:
+                - text: 620M
+                - text: 902M
+            - row "Full Download of All Data Types 12/2019 download iconDecember 2019 (CSV) download iconDecember 2019 (MS Access) CSV MS Access 69M 120M 469M 709M" [ref=e730]:
+              - cell "Full Download of All Data Types" [ref=e731]
+              - cell "12/2019" [ref=e732]
+              - cell "download iconDecember 2019 (CSV) download iconDecember 2019 (MS Access)" [ref=e733]:
+                - link "download iconDecember 2019 (CSV)" [ref=e734] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_2019-12-17.zip
+                  - img "download icon" [ref=e735]
+                  - text: December 2019 (CSV)
+                - link "download iconDecember 2019 (MS Access)" [ref=e736] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_access_2019-12-17.zip
+                  - img "download icon" [ref=e737]
+                  - text: December 2019 (MS Access)
+              - cell "CSV MS Access" [ref=e738]:
+                - text: CSV
+                - text: MS Access
+              - cell "69M 120M" [ref=e739]:
+                - text: 69M
+                - text: 120M
+              - cell "469M 709M" [ref=e740]:
+                - text: 469M
+                - text: 709M
+            - row "Full Download of All Data Types 4/2019 download iconApril 2019 (CSV) download iconApril 2019 (MS Access) CSV MS Access 61M 206M 416M 623M" [ref=e741]:
+              - cell "Full Download of All Data Types" [ref=e742]
+              - cell "4/2019" [ref=e743]
+              - cell "download iconApril 2019 (CSV) download iconApril 2019 (MS Access)" [ref=e744]:
+                - link "download iconApril 2019 (CSV)" [ref=e745] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_csv_%202019-04-02.zip
+                  - img "download icon" [ref=e746]
+                  - text: April 2019 (CSV)
+                - link "download iconApril 2019 (MS Access)" [ref=e747] [cursor=pointer]:
+                  - /url: /fdc-datasets/FoodData_Central_access_%202019-04-02.zip
+                  - img "download icon" [ref=e748]
+                  - text: April 2019 (MS Access)
+              - cell "CSV MS Access" [ref=e749]:
+                - text: CSV
+                - text: MS Access
+              - cell "61M 206M" [ref=e750]:
+                - text: 61M
+                - text: 206M
+              - cell "416M 623M" [ref=e751]:
+                - text: 416M
+                - text: 623M
+        - heading "Download Notes" [level=4] [ref=e753]
+        - list [ref=e754]:
+          - listitem [ref=e755]: The Access format has been discontinued as of October 2021. It is recommended to use the new file format, JSON, or to import CSV files from "Full Download of All Data Types" above to replace the tables within the Access format.
+          - listitem [ref=e756]: The October 2022 files contain the most recent data. These files were fixed to include some missing fields and were re-released on 12/8/2020.
+          - listitem [ref=e757]: The branded food and full download CSV archives from April 2020 to April 2022 have been re-released with corrections to the Nutrient ID column.
+          - listitem [ref=e758]: SR Legacy is the final release of the Standard Reference data type. These data will not be updated. Earlier versions of Standard Reference (i.e., SR 17 through 28) are available on the Methods and Application of Food Composition Laboratory (MAFCL) website.
+          - listitem [ref=e759]: The Food and Nutrient Database for Dietary Studies (FNDDS) is updated every two years, in conjunction with the two-year cycles of the National Health and Nutri-tion Examination Survey. The October 15, 2020 date represents the date on which FNDDS 2017-2018 was published and made available for download in FoodData Central. Earlier releases can be found on the Food Surveys Research Group website.
+          - listitem [ref=e760]: The Full Download file contains files for all of the FoodData Central data types. Therefore, whenever a download for an individual data type is updated, the Full Download file also will be updated to include those new data. The Access file only contains the most recent version of products in the Branded Foods dataset. We recommend you use the API to access previous versions of Branded Food products.
+          - listitem [ref=e761]: April 2020* Version 2 includes corrections made on May 1, 2020 to branded foods data.
+        - paragraph [ref=e762]:
+          - generic [ref=e763]:
+            - text: For more information about FoodData Central, go to the
+            - link "Frequently Asked Questions" [ref=e764] [cursor=pointer]:
+              - /url: /faq
+              - text: FAQ
+            - text: page.
+  - contentinfo [ref=e766]:
+    - link "Return to Top" [ref=e768] [cursor=pointer]:
+      - /url: /download-datasets#top
+    - generic [ref=e769]:
+      - navigation "Main" [ref=e772]:
+        - list [ref=e773]:
+          - listitem [ref=e774]:
+            - link "Home" [ref=e775] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=e776]:
+            - link "Food Search" [ref=e777] [cursor=pointer]:
+              - /url: /food-search
+          - listitem [ref=e778]:
+            - link "Component Search" [ref=e779] [cursor=pointer]:
+              - /url: /food-search?component=0
+          - listitem [ref=e780]:
+            - link "Data Type Documentation" [ref=e781] [cursor=pointer]:
+              - /url: /data-documentation
+          - listitem [ref=e782]:
+            - link "Download Data" [ref=e783] [cursor=pointer]:
+              - /url: /download-datasets
+          - listitem [ref=e784]:
+            - link "API Guide" [ref=e785] [cursor=pointer]:
+              - /url: /api-guide
+          - listitem [ref=e786]:
+            - link "Help" [ref=e787] [cursor=pointer]:
+              - /url: /help
+          - listitem [ref=e788]:
+            - link "FAQ" [ref=e789] [cursor=pointer]:
+              - /url: /faq
+          - listitem [ref=e790]:
+            - link "About Us" [ref=e791] [cursor=pointer]:
+              - /url: /about-us
+          - listitem [ref=e792]:
+            - link "Contact FoodData Central" [ref=e793] [cursor=pointer]:
+              - /url: /contact
+      - navigation "Government" [ref=e796]:
+        - list [ref=e797]:
+          - listitem [ref=e798]:
+            - link "AskUSDA" [ref=e799] [cursor=pointer]:
+              - /url: https://ask.usda.gov/s/
+          - listitem [ref=e800]:
+            - link "USDA.gov" [ref=e801] [cursor=pointer]:
+              - /url: https://www.usda.gov/
+          - listitem [ref=e802]:
+            - link "Agricultural Research Service" [ref=e803] [cursor=pointer]:
+              - /url: https://www.ars.usda.gov/
+          - listitem [ref=e804]:
+            - link "Plain Writing" [ref=e805] [cursor=pointer]:
+              - /url: https://www.usda.gov/plain-writing
+          - listitem [ref=e806]:
+            - link "FOIA" [ref=e807] [cursor=pointer]:
+              - /url: https://www.dm.usda.gov/foia/
+          - listitem [ref=e808]:
+            - link "Accessibility Statement" [ref=e809] [cursor=pointer]:
+              - /url: https://www.usda.gov/accessibility-statement
+          - listitem [ref=e810]:
+            - link "Information Quality" [ref=e811] [cursor=pointer]:
+              - /url: https://www.ocio.usda.gov/policy-directives-records-forms/information-quality-activities
+          - listitem [ref=e812]:
+            - link "Privacy Policy" [ref=e813] [cursor=pointer]:
+              - /url: https://www.usda.gov/privacy-policy
+          - listitem [ref=e814]:
+            - link "Non-Discrimination Statement" [ref=e815] [cursor=pointer]:
+              - /url: https://www.usda.gov/non-discrimination-statement
+          - listitem [ref=e816]:
+            - link "USA.gov" [ref=e817] [cursor=pointer]:
+              - /url: https://www.usa.gov/
+          - listitem [ref=e818]:
+            - link "WhiteHouse.gov" [ref=e819] [cursor=pointer]:
+              - /url: https://www.whitehouse.gov/
+    - generic [ref=e820]:
+      - generic [ref=e824]:
+        - link "The U.S. Department of Agriculture Home Page" [ref=e825] [cursor=pointer]:
+          - /url: https://www.usda.gov/
+          - text: U.S. Department of Agriculture
+        - link "The Agricultural Research Service Home Page" [ref=e826] [cursor=pointer]:
+          - /url: https://www.ars.usda.gov/
+          - text: Agricultural Research Service
+      - generic [ref=e828]:
+        - link "ARS on Twitter" [ref=e829] [cursor=pointer]:
+          - /url: http://twitter.com/usda_ars
+          - generic [ref=e830]: ARS on Twitter
+        - link "Email Lists" [ref=e831] [cursor=pointer]:
+          - /url: https://public.govdelivery.com/accounts/USDAARS/subscriber/new
+          - generic [ref=e832]: Email Lists
+        - link "AgResearch Magazine" [ref=e833] [cursor=pointer]:
+          - /url: https://agresearchmag.ars.usda.gov/
+          - generic [ref=e834]: AgResearch Magazine
+        - link "ARS Podcasts" [ref=e835] [cursor=pointer]:
+          - /url: https://www.ars.usda.gov/oc/podcasts/index/
+          - generic [ref=e836]: ARS Podcasts
