@@ -61,9 +61,9 @@ class NutritionMatcher:
 
         tier_exact: list[USDAEntry] = []    # 1. desc_zh == q
         tier_prefix: list[USDAEntry] = []   # 2. desc_zh.startswith(q)
-        tier_substr: list[USDAEntry] = []   # 3. q in desc_zh
-        tier_en: list[USDAEntry] = []       # 4. q in desc_en
-        tier_fuzzy: list[USDAEntry] = []    # 5. all words match
+        tier_substr: list[USDAEntry] = []   # 3. all keywords in desc_zh
+        tier_en: list[USDAEntry] = []       # 4. all keywords in desc_en
+        tier_fuzzy: list[USDAEntry] = []    # 5. all keywords in combined
 
         for entry in self._entries:
             desc_en = entry.description.lower()
@@ -73,9 +73,9 @@ class NutritionMatcher:
                 tier_exact.append(entry)
             elif desc_zh.startswith(q_lower):
                 tier_prefix.append(entry)
-            elif q_lower in desc_zh:
+            elif all(w in desc_zh for w in words):
                 tier_substr.append(entry)
-            elif q_lower in desc_en:
+            elif all(w in desc_en for w in words):
                 tier_en.append(entry)
             elif len(words) > 1:
                 combined = f"{desc_en} {desc_zh}"

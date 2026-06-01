@@ -45,10 +45,14 @@ class IngredientManager:
         self._name_index.pop(remove, None)
 
     def search(self, query: str) -> list[Ingredient]:
-        query = query.lower()
+        keywords = query.lower().split()
+        if not keywords:
+            return list(self._ingredients.values())
         results = []
         for ing in self._ingredients.values():
-            if query in ing.name.lower() or any(query in a.lower() for a in ing.aliases):
+            name = ing.name.lower()
+            aliases = [a.lower() for a in ing.aliases]
+            if all(kw in name or any(kw in a for a in aliases) for kw in keywords):
                 results.append(ing)
         return results
 

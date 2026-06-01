@@ -871,6 +871,180 @@ class BaiduTranslateProvider(TranslationProvider):
         return results
 
 # ---------------------------------------------------------------------------
+# 阿里云机器翻译提供者
+# ---------------------------------------------------------------------------
+
+class AliyunMTProvider(TranslationProvider):
+    """阿里云机器翻译 TranslateGeneral API。
+
+    使用 AccessKey ID + AccessKey Secret 认证，V3 签名（ACS3-HMAC-SHA256）。
+    认证格式: --translator-api-key AccessKeyId:AccessKeySecret
+    环境变量: ALIYUN_ACCESS_KEY_ID / ALIYUN_ACCESS_KEY_SECRET
+
+    参考文档: https://help.aliyun.com/zh/machine-translation/developer-reference/api-alimt-2018-10-12-translategeneral
+    QPS 限制: 50，单次最大 5000 字符
+    """
+    name = "aliyun"
+    description = "阿里云机器翻译 (EN→ZH，QPS 50)"
+
+    def __init__(self, api_key: str = "", base_url: str = "") -> None:
+        # api_key 格式: "AccessKeyId:AccessKeySecret"
+        raw = api_key or os.environ.get("TRANSLATOR_API_KEY", "")
+        if ":" in raw:
+            self.access_key_id, self.access_key_secret = raw.split(":", 1)
+        else:
+            self.access_key_id = os.environ.get("ALIYUN_ACCESS_KEY_ID", raw)
+            self.access_key_secret = os.environ.get("ALIYUN_ACCESS_KEY_SECRET", "")
+        self.host = (base_url or os.environ.get("TRANSLATOR_BASE_URL",
+                     "mt.cn-hangzhou.aliyuncs.com")).rstrip("/")
+
+    def check_available(self) -> bool:
+        return bool(self.access_key_id and self.access_key_secret)
+
+    def translate(self, prompt: str) -> str | None:
+        return None
+
+    def _call_api(self, q: str, max_retries: int = 5) -> str | None:
+        """调用阿里云 TranslateGeneral API，返回翻译文本或 None。
+
+        使用 ACS3-HMAC-SHA256 V3 签名，参数通过查询字符串传递（RPC 风格）。
+        """
+        import hashlib
+        import hmac
+        import time
+        import uuid
+        from urllib.parse import quote
+
+        endpoint = f"https://{self.host}"
+
+        # RPC 风格：参数放在查询字符串
+        query_params = {
+            "Action": "TranslateGeneral",
+            "Version": "2018-10-12",
+            "FormatType": "text",
+            "SourceLanguage": "en",
+            "TargetLanguage": "zh",
+            "SourceText": q,
+            "Scene": "general",
+        }
+
+        backoff_times = [2, 4, 8, 16, 32]
+
+        for attempt in range(1, max_retries + 1):
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            nonce = str(uuid.uuid4())
+            hashed_payload = hashlib.sha256(b"").hexdigest()
+
+            # 构造参与签名的 headers（小写键名）
+            sign_headers = {
+                "content-type": "application/json; charset=utf-8",
+                "host": self.host,
+                "x-acs-action": "TranslateGeneral",
+                "x-acs-content-sha256": hashed_payload,
+                "x-acs-date": now,
+                "x-acs-signature-nonce": nonce,
+                "x-acs-version": "2018-10-12",
+            }
+
+            # 规范化查询字符串
+            canonical_qs = "&".join(
+                f"{quote(k, safe='')}={quote(v, safe='')}"
+                for k, v in sorted(query_params.items())
+            )
+
+            # 规范化请求
+            sorted_keys = sorted(sign_headers.keys())
+            signed_headers_str = ";".join(sorted_keys)
+            canonical_headers = "".join(
+                f"{k}:{sign_headers[k].strip()}\n" for k in sorted_keys
+            )
+            canonical_request = (
+                f"POST\n/\n{canonical_qs}\n"
+                f"{canonical_headers}\n{signed_headers_str}\n{hashed_payload}"
+            )
+
+            # 待签名字符串
+            string_to_sign = (
+                f"ACS3-HMAC-SHA256\n"
+                f"{hashlib.sha256(canonical_request.encode('utf-8')).hexdigest()}"
+            )
+
+            # HMAC-SHA256 签名
+            signature = hmac.new(
+                self.access_key_secret.encode("utf-8"),
+                string_to_sign.encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()
+
+            # Authorization 头
+            authorization = (
+                f"ACS3-HMAC-SHA256 "
+                f"Credential={self.access_key_id},"
+                f"SignedHeaders={signed_headers_str},"
+                f"Signature={signature}"
+            )
+
+            qs = "&".join(
+                f"{quote(k, safe='')}={quote(v, safe='')}"
+                for k, v in query_params.items()
+            )
+            url = f"{endpoint}/?{qs}"
+
+            req = urllib.request.Request(url, data=b"", method="POST")
+            for k, v in sign_headers.items():
+                req.add_header(k, v)
+            req.add_header("Authorization", authorization)
+
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                code = data.get("Code")
+                # Code 可能是 int 200 或 str "200"
+                if code is not None and str(code) != "200":
+                    wait = backoff_times[min(attempt - 1, len(backoff_times) - 1)]
+                    log(f"[API ERROR] 阿里云翻译错误 {code}: {data.get('Message', '')} (重试 {attempt}/{max_retries}, 等待 {wait}s)")
+                    log(f"  URL: {url}")
+                    log(f"  响应: {json.dumps(data, ensure_ascii=False)}")
+                    if attempt < max_retries:
+                        time.sleep(wait)
+                        continue
+                    return None
+                translated = data.get("Data", {}).get("Translated", "")
+                return translated or None
+            except Exception as e:
+                wait = backoff_times[min(attempt - 1, len(backoff_times) - 1)]
+                log(f"[API ERROR] 阿里云翻译请求失败: {e} (重试 {attempt}/{max_retries}, 等待 {wait}s)")
+                if attempt < max_retries:
+                    time.sleep(wait)
+
+        return None
+
+    def translate_texts(self, texts: list[str]) -> list[str] | None:
+        """并发翻译文本列表。
+
+        阿里云 TranslateGeneral 无批量模式，QPS 限制 10。
+        使用线程池并发请求，max_workers=8 留出余量避免触发限流。
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        results: list[str | None] = [None] * len(texts)
+
+        def _do_translate(idx: int, text: str) -> tuple[int, str]:
+            translated = self._call_api(text)
+            return idx, translated if translated else text
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {
+                pool.submit(_do_translate, i, text): i
+                for i, text in enumerate(texts)
+            }
+            for future in as_completed(futures):
+                idx, result = future.result()
+                results[idx] = result
+
+        return list(results)
+
+# ---------------------------------------------------------------------------
 # 提供者注册表
 # ---------------------------------------------------------------------------
 
@@ -880,6 +1054,7 @@ PROVIDER_CLASSES: dict[str, type[TranslationProvider]] = {
     "anthropic": AnthropicAPIProvider,
     "deepl": DeepLProvider,
     "baidu": BaiduTranslateProvider,
+    "aliyun": AliyunMTProvider,
 }
 
 def create_provider(name: str, **kwargs) -> TranslationProvider | None:
@@ -943,7 +1118,7 @@ def _translate_batch(
     MAX_RETRIES = 3
 
     # ---- 纯文本翻译提供者（DeepL / 百度翻译） ----
-    if isinstance(provider, (DeepLProvider, BaiduTranslateProvider)):
+    if isinstance(provider, (DeepLProvider, BaiduTranslateProvider, AliyunMTProvider)):
         return _translate_batch_text(batch, slim_batch, batch_num, total_batches, provider)
 
     # ---- LLM 提供者 ----

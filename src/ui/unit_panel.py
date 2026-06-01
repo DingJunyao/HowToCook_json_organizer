@@ -178,8 +178,11 @@ class UnitPanel(QWidget):
         query = self._search_edit.text().strip().lower()
         units = self._mgr.get_all()
         if query:
-            units = [u for u in units if query in u.name.lower()
-                     or any(query in a.lower() for a in u.aliases)]
+            keywords = query.split()
+            units = [u for u in units
+                     if all(kw in u.name.lower()
+                            or any(kw in a.lower() for a in u.aliases)
+                            for kw in keywords)]
 
         for unit in sorted(units, key=lambda u: u.name):
             aliases_text = f" ({', '.join(unit.aliases)})" if unit.aliases else ""

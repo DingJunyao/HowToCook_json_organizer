@@ -136,10 +136,10 @@ class NutritionIngredientList(QWidget):
     def _passes_search(self, ing) -> bool:
         if not self._search_text:
             return True
-        q = self._search_text.lower()
-        if q in ing.name.lower():
-            return True
-        return any(q in a.lower() for a in ing.aliases)
+        keywords = self._search_text.lower().split()
+        name = ing.name.lower()
+        aliases = [a.lower() for a in ing.aliases]
+        return all(kw in name or any(kw in a for a in aliases) for kw in keywords)
 
     def _set_filter(self, mode: str) -> None:
         self._filter_mode = mode
