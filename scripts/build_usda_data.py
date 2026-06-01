@@ -178,6 +178,7 @@ NUTRIENT_TRANSLATIONS: dict[str, str] = {
     "Citric acid": "柠檬酸",
     "Malic acid": "苹果酸",
     "Oxalic acid": "草酸",
+    "Phytosterols": "植物甾醇",
 }
 
 def _translate_fatty_acid(name: str) -> str | None:
@@ -992,7 +993,14 @@ def translate_descriptions(
 
     while True:
         total_round += 1
-        to_translate = [item for item in all_data if not item.get("description_zh")]
+        to_translate = [
+            item for item in all_data
+            if not item.get("description_zh") or item["description_zh"] == item.get("description", "")
+        ]
+        # 清除等于原文的无效翻译，以便重新翻译
+        for item in to_translate:
+            if item.get("description_zh") and item["description_zh"] == item.get("description", ""):
+                item["description_zh"] = ""
 
         if not to_translate:
             log("[INFO]   所有条目已翻译完毕!")
@@ -1044,7 +1052,10 @@ def translate_descriptions(
         log(f"[INFO]   第 {total_round} 轮完成: 翻译 {round_translated}/{len(to_translate)} 条")
         if stalled_passes == 0 and current_untranslated > 0:
             # 有进展但仍有余量，继续下一轮
-            remaining = sum(1 for item in all_data if not item.get("description_zh"))
+            remaining = sum(
+                1 for item in all_data
+                if not item.get("description_zh") or item["description_zh"] == item.get("description", "")
+            )
             if remaining > 0:
                 log(f"[INFO]   仍有 {remaining} 条未翻译，继续下一轮...")
 
@@ -1150,7 +1161,10 @@ def build_usda_data(
             all_data = json.load(f)
 
         total = len(all_data)
-        untranslated = sum(1 for item in all_data if not item.get("description_zh"))
+        untranslated = sum(
+            1 for item in all_data
+            if not item.get("description_zh") or item["description_zh"] == item.get("description", "")
+        )
         log(f"[INFO]   加载 {total} 条, 已翻译 {total - untranslated} 条, 未翻译 {untranslated} 条")
 
         if untranslated == 0:
@@ -1237,7 +1251,7 @@ def build_usda_data(
     if old_translations:
         restored = 0
         for item in all_data:
-            if not item.get("description_zh") and item["fdc_id"] in old_translations:
+            if (not item.get("description_zh") or item["description_zh"] == item.get("description", "")) and item["fdc_id"] in old_translations:
                 item["description_zh"] = old_translations[item["fdc_id"]]
                 restored += 1
         if restored:

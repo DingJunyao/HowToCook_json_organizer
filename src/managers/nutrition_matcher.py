@@ -50,7 +50,10 @@ class NutritionMatcher:
         data sources) are deduplicated, keeping the entry with the most nutrient data.
         """
         q = query.strip()
-        if len(q) < 2:
+        if not q:
+            return []
+        # 单个 ASCII 字符搜索无意义，但单个汉字是有效搜索词
+        if len(q) < 2 and q.isascii():
             return []
 
         q_lower = q.lower()

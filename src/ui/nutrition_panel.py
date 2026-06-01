@@ -310,6 +310,8 @@ class NutritionPanel(QWidget):
             item = QListWidgetItem("（无匹配结果）")
             item.setData(0x0100, None)
             self._candidate_list.addItem(item)
+            # 即使无结果，已匹配条目仍需高亮显示
+            self._highlight_matched()
             return
 
         for entry in self._current_search_results:
@@ -318,14 +320,78 @@ class NutritionPanel(QWidget):
             item.setData(0x0100, entry.fdc_id)
             self._candidate_list.addItem(item)
 
+        # 高亮已匹配条目
+        self._highlight_matched()
+
+    def _highlight_matched(self) -> None:
+        """在候选列表中高亮当前食材已匹配的 USDA 条目。
+
+        - 搜索结果已包含已匹配条目 → 加粗并选中
+        - 搜索结果不包含 → 插入到列表顶部，加粗并选中
+        """
+        if self._current_key is None or self._matcher is None:
+            return
+
+        ing = self._get_ingredient(self._current_key)
+        if ing is None or ing.usda_match_status != "matched" or ing.usda_id is None:
+            return
+
+        matched_fdc_id = ing.usda_id
+        matched_item = None
+
+        # 在已有结果中查找已匹配条目
+        for i in range(self._candidate_list.count()):
+            item = self._candidate_list.item(i)
+            if item.data(0x0100) == matched_fdc_id:
+                matched_item = item
+                break
+
+        if matched_item is None:
+            # 搜索结果不包含已匹配条目，插入到顶部
+            entry = self._matcher.get_entry(matched_fdc_id)
+            if entry:
+                # 先移除"无匹配结果"占位项
+                if self._candidate_list.count() == 1:
+                    placeholder = self._candidate_list.item(0)
+                    if placeholder.data(0x0100) is None:
+                        self._candidate_list.takeItem(0)
+                        self._current_search_results = []
+
+                self._current_search_results.insert(0, entry)
+                label = (
+                    f"{entry.description_zh} ({entry.description})"
+                    if entry.description_zh
+                    else entry.description
+                )
+                matched_item = QListWidgetItem(label)
+                matched_item.setData(0x0100, entry.fdc_id)
+                self._candidate_list.insertItem(0, matched_item)
+
+        if matched_item is not None:
+            font = matched_item.font()
+            font.setBold(True)
+            matched_item.setFont(font)
+            self._candidate_list.setCurrentItem(matched_item)
+
+    def _get_entry_for_item(self, item: QListWidgetItem) -> USDAEntry | None:
+        """Look up the USDAEntry for a QListWidgetItem by row index.
+
+        This avoids relying on ``setData`` / ``data`` round-trip through
+        PySide6's QVariant marshaling which may change the Python type.
+        """
+        if item is None or self._matcher is None:
+            return None
+        row = self._candidate_list.row(item)
+        if 0 <= row < len(self._current_search_results):
+            return self._current_search_results[row]
+        return None
+
     def _on_candidate_clicked(self, item: QListWidgetItem) -> None:
         """Show nutrition preview when a candidate is clicked."""
-        fdc_id = item.data(0x0100)
-        if not isinstance(fdc_id, int) or self._matcher is None:
+        entry = self._get_entry_for_item(item)
+        if entry is None:
             return
-        nutrients = self._matcher.get_nutrition(fdc_id)
-        if nutrients:
-            self.show_nutrition(nutrients)
+        self.show_nutrition(entry.nutrients)
 
     def _on_candidate_changed(self, current: QListWidgetItem, _previous: QListWidgetItem) -> None:
         """Show nutrition preview when the current candidate changes (click or keyboard)."""
@@ -341,15 +407,15 @@ class NutritionPanel(QWidget):
         if current_item is None:
             return
 
-        fdc_id = current_item.data(0x0100)
-        if not isinstance(fdc_id, int):
+        entry = self._get_entry_for_item(current_item)
+        if entry is None:
             return
 
         ing = self._get_ingredient(self._current_key)
         if ing is None:
             return
 
-        ing.usda_id = fdc_id
+        ing.usda_id = entry.fdc_id
         ing.usda_match_status = "matched"
 
         self._update_match_status(ing)
