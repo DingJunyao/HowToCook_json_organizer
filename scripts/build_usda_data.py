@@ -13,6 +13,7 @@
     openai        OpenAI API 及兼容接口 (DeepSeek / Ollama / vLLM)
     anthropic     Anthropic API 直接调用
     deepl         DeepL 翻译平台 (EN→ZH 质量最佳)
+    baidu         百度翻译 API (标准版免费)
 
 示例:
     # Claude Code
@@ -30,12 +31,20 @@
     # DeepL
     python scripts/build_usda_data.py --translator deepl --translator-api-key xxx
 
+    # 百度翻译 (标准版免费, api-key 格式: APP_ID:SECRET_KEY)
+    python scripts/build_usda_data.py --translator baidu --translator-api-key APP_ID:SECRET_KEY
+
     # 环境变量
     set TRANSLATOR=openai
     set TRANSLATOR_API_KEY=sk-xxx
     set TRANSLATOR_BASE_URL=https://api.deepseek.com/v1
     set TRANSLATOR_MODEL=deepseek-chat
     python scripts/build_usda_data.py
+
+    # 百度翻译也可通过环境变量配置
+    set TRANSLATOR=baidu
+    set TRANSLATOR_API_KEY=APP_ID:SECRET_KEY
+    python scripts/build_usda_data.py --translate-only
 
     # 列出提供者
     python scripts/build_usda_data.py --list-translators
@@ -723,6 +732,144 @@ class DeepLProvider(TranslationProvider):
             log(f"[API ERROR] DeepL 请求失败: {e}")
             return None
 
+
+class BaiduTranslateProvider(TranslationProvider):
+    """百度翻译 API (https://fanyi-api.baidu.com)。
+
+    使用标准版可免费调用（QPS 限制），需要 APP ID 和密钥。
+    认证格式: --translator-api-key APP_ID:SECRET_KEY
+    环境变量: BAIDU_TRANSLATE_APP_ID / BAIDU_TRANSLATE_SECRET_KEY
+
+    参考文档: https://fanyi-api.baidu.com/doc/21
+    签名: MD5(appid + q + salt + 密钥)，q 在签名时不做 URL encode
+    """
+    name = "baidu"
+    description = "百度翻译 API (EN→ZH，标准版免费)"
+
+    def __init__(self, api_key: str = "", base_url: str = "") -> None:
+        # api_key 格式: "APP_ID:SECRET_KEY"
+        raw = api_key or os.environ.get("TRANSLATOR_API_KEY", "")
+        if ":" in raw:
+            self.app_id, self.secret_key = raw.split(":", 1)
+        else:
+            # 也支持独立环境变量
+            self.app_id = os.environ.get("BAIDU_TRANSLATE_APP_ID", raw)
+            self.secret_key = os.environ.get("BAIDU_TRANSLATE_SECRET_KEY", "")
+        self.base_url = (base_url or os.environ.get("TRANSLATOR_BASE_URL",
+                         "https://fanyi-api.baidu.com")).rstrip("/")
+
+    def check_available(self) -> bool:
+        return bool(self.app_id and self.secret_key)
+
+    def translate(self, prompt: str) -> str | None:
+        return None
+
+    def _call_api(self, q: str, max_retries: int = 5) -> list[dict] | None:
+        """调用百度翻译 API，返回 trans_result 列表或 None。
+
+        使用指数退避重试：5s → 8s → 13s → 21s → 29s
+        """
+        import hashlib
+        import random
+        import time
+        from urllib.parse import urlencode
+        url = f"{self.base_url}/api/trans/vip/translate"
+        backoff_times = [5, 8, 13, 21, 29]
+
+        for attempt in range(1, max_retries + 1):
+            salt = str(random.randint(32768, 65536))
+            sign_str = f"{self.app_id}{q}{salt}{self.secret_key}"
+            sign = hashlib.md5(sign_str.encode("utf-8")).hexdigest()
+
+            body = urlencode({
+                "q": q,
+                "from": "en",
+                "to": "zh",
+                "appid": self.app_id,
+                "salt": salt,
+                "sign": sign,
+            }).encode("utf-8")
+
+            req = urllib.request.Request(url, data=body, method="POST")
+            req.add_header("Content-Type", "application/x-www-form-urlencoded")
+
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                error_code = data.get("error_code")
+                if error_code:
+                    wait = backoff_times[min(attempt - 1, len(backoff_times) - 1)]
+                    log(f"[API ERROR] 百度翻译错误 {error_code}: {data.get('error_msg', '')} (重试 {attempt}/{max_retries}, 等待 {wait}s)")
+                    if attempt < max_retries:
+                        time.sleep(wait)
+                        continue
+                    return None
+                return data.get("trans_result", [])
+            except Exception as e:
+                wait = backoff_times[min(attempt - 1, len(backoff_times) - 1)]
+                log(f"[API ERROR] 百度翻译请求失败: {e} (重试 {attempt}/{max_retries}, 等待 {wait}s)")
+                if attempt < max_retries:
+                    time.sleep(wait)
+
+        return None
+
+    def translate_texts(self, texts: list[str]) -> list[str] | None:
+        """批量翻译文本列表。
+
+        百度翻译支持用 \\n 分隔多条文本一次请求翻译（单次上限 6000 字符）。
+        将文本按字符数分组，每组一次请求，大幅减少 API 调用次数。
+        """
+        import time
+
+        # 按字符数分组，每组不超过 6000 字符（含 \\n 分隔符）
+        MAX_CHARS = 6000
+        groups: list[list[int]] = []  # 每组存放原文索引
+        current_group: list[int] = []
+        current_len = 0
+
+        for i, text in enumerate(texts):
+            needed = len(text.encode("utf-8")) + (1 if current_group else 0)
+            if current_group and current_len + needed > MAX_CHARS:
+                groups.append(current_group)
+                current_group = []
+                current_len = 0
+            current_group.append(i)
+            current_len += len(text.encode("utf-8")) + (1 if len(current_group) > 1 else 0)
+        if current_group:
+            groups.append(current_group)
+
+        results: list[str] = [""] * len(texts)
+
+        for gi, indices in enumerate(groups):
+            group_texts = [texts[i] for i in indices]
+            q = "\n".join(group_texts)
+
+            trans_result = self._call_api(q)
+            if trans_result is None:
+                # 整组失败，保留原文
+                for idx in indices:
+                    results[idx] = texts[idx]
+            else:
+                dsts = [r["dst"] for r in trans_result]
+                if len(dsts) == len(indices):
+                    for idx, dst in zip(indices, dsts):
+                        results[idx] = dst
+                else:
+                    # 结果数与输入不匹配，逐条回退翻译
+                    for idx in indices:
+                        single = self._call_api(texts[idx])
+                        if single and len(single) >= 1:
+                            results[idx] = "".join(r["dst"] for r in single)
+                        else:
+                            results[idx] = texts[idx]
+                        time.sleep(10)
+
+            # 标准版 QPS=1，组间间隔确保不触发限流
+            if gi < len(groups) - 1:
+                time.sleep(10)
+
+        return results
+
 # ---------------------------------------------------------------------------
 # 提供者注册表
 # ---------------------------------------------------------------------------
@@ -732,6 +879,7 @@ PROVIDER_CLASSES: dict[str, type[TranslationProvider]] = {
     "openai": OpenAICompatibleProvider,
     "anthropic": AnthropicAPIProvider,
     "deepl": DeepLProvider,
+    "baidu": BaiduTranslateProvider,
 }
 
 def create_provider(name: str, **kwargs) -> TranslationProvider | None:
@@ -794,9 +942,9 @@ def _translate_batch(
     """用指定提供者翻译一批食物描述，带重试逻辑。"""
     MAX_RETRIES = 3
 
-    # ---- DeepL 特殊处理 ----
-    if isinstance(provider, DeepLProvider):
-        return _translate_batch_deepl(batch, slim_batch, batch_num, total_batches, provider)
+    # ---- 纯文本翻译提供者（DeepL / 百度翻译） ----
+    if isinstance(provider, (DeepLProvider, BaiduTranslateProvider)):
+        return _translate_batch_text(batch, slim_batch, batch_num, total_batches, provider)
 
     # ---- LLM 提供者 ----
     is_claude = isinstance(provider, ClaudeCodeProvider)
@@ -854,19 +1002,19 @@ def _translate_batch(
     _cleanup_temp_files(input_path, output_path)
     return batch
 
-def _translate_batch_deepl(
+def _translate_batch_text(
     batch: list[dict],
     slim_batch: list[dict],
     batch_num: int,
     total_batches: int,
-    provider: "DeepLProvider",
+    provider: TranslationProvider,
 ) -> list[dict]:
-    """使用 DeepL 翻译一批食物描述（纯文本翻译 → 映射回 JSON）。"""
+    """使用纯文本翻译提供者（DeepL / 百度翻译）翻译一批食物描述。"""
     MAX_RETRIES = 3
     descriptions = [item["description"] for item in slim_batch]
 
     for attempt in range(1, MAX_RETRIES + 1):
-        label = f"[TRANSLATE] 批次 {batch_num}/{total_batches} ({len(batch)} 条, DeepL)"
+        label = f"[TRANSLATE] 批次 {batch_num}/{total_batches} ({len(batch)} 条, {provider.name})"
         if attempt > 1:
             label += f" [重试 {attempt}/{MAX_RETRIES}]"
         log(f"{label}...", end="")
@@ -1037,6 +1185,11 @@ def translate_descriptions(
             ]
 
             translated_batch = _translate_batch(batch, slim_batch, batch_num, total_batches, provider)
+
+            # 百度翻译 QPS=1：批次间加间隔，避免连续请求触发限流
+            if isinstance(provider, BaiduTranslateProvider) and batch_num < total_batches:
+                import time
+                time.sleep(2.5)
 
             for item in translated_batch:
                 if item.get("description_zh") and item["description_zh"] != item.get("description", ""):
@@ -1355,6 +1508,9 @@ def main():
         print()
         print("  # DeepL 翻译平台")
         print("  python scripts/build_usda_data.py --translator deepl --translator-api-key xxx")
+        print()
+        print("  # 百度翻译 API (标准版免费)")
+        print("  python scripts/build_usda_data.py --translator baidu --translator-api-key APP_ID:SECRET_KEY")
         print()
         print("  # 通过环境变量配置")
         print("  set TRANSLATOR=openai")

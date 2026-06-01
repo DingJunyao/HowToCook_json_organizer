@@ -27,6 +27,7 @@ TRANSLATOR_CHOICES = [
     ("openai",      "OpenAI / 兼容 API (DeepSeek 等)"),
     ("anthropic",   "Anthropic API"),
     ("deepl",       "DeepL 翻译平台"),
+    ("baidu",       "百度翻译 API (标准版免费)"),
 ]
 
 
@@ -78,17 +79,33 @@ class SettingsDialog(QDialog):
         self._ts_combo.currentIndexChanged.connect(self._on_ts_changed)
         ts_form.addRow("翻译引擎:", self._ts_combo)
 
+        # 通用字段：API Key（OpenAI / Anthropic / DeepL）
         self._ts_api_key = QLineEdit()
         self._ts_api_key.setEchoMode(QLineEdit.EchoMode.Password)
         ts_form.addRow("API Key:", self._ts_api_key)
 
+        # 百度翻译专用字段：APP ID 和密钥
+        self._ts_baidu_appid = QLineEdit()
+        self._ts_baidu_appid.setPlaceholderText("百度翻译 APP ID")
+        ts_form.addRow("APP ID:", self._ts_baidu_appid)
+
+        self._ts_baidu_secret = QLineEdit()
+        self._ts_baidu_secret.setEchoMode(QLineEdit.EchoMode.Password)
+        self._ts_baidu_secret.setPlaceholderText("百度翻译密钥")
+        ts_form.addRow("密钥:", self._ts_baidu_secret)
+
+        # 通用字段：接口地址
         self._ts_base_url = QLineEdit()
         ts_form.addRow("接口地址:", self._ts_base_url)
 
+        # 通用字段：模型
         self._ts_model = QLineEdit()
         ts_form.addRow("模型:", self._ts_model)
 
         layout.addRow(ts_group)
+
+        # 初始状态
+        self._on_ts_changed()
 
         # ================================================================
         # 按钮
@@ -143,9 +160,19 @@ class SettingsDialog(QDialog):
         """获取 USDA 翻译配置（供 usda_import_dialog 使用）。"""
         config = SettingsDialog.load_config()
         ts = config.get("usda_translator", {})
+        provider = ts.get("provider", "claude-code")
+
+        # 百度翻译：从独立字段拼接 api_key
+        if provider == "baidu":
+            appid = ts.get("baidu_appid", "")
+            secret = ts.get("baidu_secret", "")
+            api_key = f"{appid}:{secret}" if appid and secret else ""
+        else:
+            api_key = ts.get("api_key", "")
+
         return {
-            "provider": ts.get("provider", "claude-code"),
-            "api_key": ts.get("api_key", ""),
+            "provider": provider,
+            "api_key": api_key,
             "base_url": ts.get("base_url", ""),
             "model": ts.get("model", ""),
         }
@@ -162,6 +189,8 @@ class SettingsDialog(QDialog):
             "usda_translator": {
                 "provider": self._ts_combo.currentData(),
                 "api_key": self._ts_api_key.text().strip(),
+                "baidu_appid": self._ts_baidu_appid.text().strip(),
+                "baidu_secret": self._ts_baidu_secret.text().strip(),
                 "base_url": self._ts_base_url.text().strip(),
                 "model": self._ts_model.text().strip(),
             },
@@ -179,6 +208,8 @@ class SettingsDialog(QDialog):
                 self._ts_combo.setCurrentIndex(i)
                 break
         self._ts_api_key.setText(ts_config.get("api_key", ""))
+        self._ts_baidu_appid.setText(ts_config.get("baidu_appid", ""))
+        self._ts_baidu_secret.setText(ts_config.get("baidu_secret", ""))
         self._ts_base_url.setText(ts_config.get("base_url", ""))
         self._ts_model.setText(ts_config.get("model", ""))
         self._on_ts_changed()
@@ -198,14 +229,25 @@ class SettingsDialog(QDialog):
             self._output_edit.setText(path)
 
     def _on_ts_changed(self) -> None:
-        """翻译引擎切换时，启用/禁用相关字段并更新占位符。"""
+        """翻译引擎切换时，显示/隐藏相关字段并更新占位符。"""
         provider = self._ts_combo.currentData()
         is_claude = provider == "claude-code"
         is_deepl = provider == "deepl"
+        is_baidu = provider == "baidu"
 
+        # 通用字段可见性
+        self._ts_api_key.setVisible(not is_baidu)
+        self._ts_base_url.setVisible(not is_claude and not is_baidu)
+        self._ts_model.setVisible(not is_claude and not is_deepl and not is_baidu)
+
+        # 百度翻译专用字段
+        self._ts_baidu_appid.setVisible(is_baidu)
+        self._ts_baidu_secret.setVisible(is_baidu)
+
+        # 通用字段启用状态（可见时才考虑启用）
         self._ts_api_key.setEnabled(not is_claude)
-        self._ts_base_url.setEnabled(not is_claude)
-        self._ts_model.setEnabled(not is_claude and not is_deepl)
+        self._ts_base_url.setEnabled(True)
+        self._ts_model.setEnabled(True)
 
         if is_claude:
             self._ts_api_key.setPlaceholderText("Claude Code 本地运行，无需 API Key")
