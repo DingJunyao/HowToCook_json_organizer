@@ -154,6 +154,7 @@ class MainWindow(QMainWindow):
             if new_count:
                 print(f"[MainWindow] Discovered {new_count} new unit(s) from recipes: {discovered_units}")
         self.recipe_tab.set_unit_manager(self._um)
+        self.nutrition_tab.set_unit_manager(self._um)
 
         # Nutrition matcher
         self._load_nutrition_data(output_dir)
@@ -173,6 +174,14 @@ class MainWindow(QMainWindow):
         """
         result = []
         for item in raw:
+            # 确保 fdc_id 为 int 类型，与 USDA 数据一致（legacy 文件中可能是字符串）
+            try:
+                fdc_id = int(item.get("usda_id", 0))
+            except (ValueError, TypeError):
+                continue  # 跳过无效的 usda_id
+            if not fdc_id:
+                continue  # 跳过 usda_id 为 0 或缺失的条目
+
             nutrients = []
             raw_nutrients = item.get("nutrients", {})
             if isinstance(raw_nutrients, dict):
@@ -185,7 +194,7 @@ class MainWindow(QMainWindow):
                             "unit": val.get("unit", ""),
                         })
             result.append({
-                "fdc_id": item.get("usda_id", 0),
+                "fdc_id": fdc_id,
                 "description": item.get("usda_name", ""),
                 "description_zh": item.get("ingredient_name", ""),
                 "nutrients": nutrients,

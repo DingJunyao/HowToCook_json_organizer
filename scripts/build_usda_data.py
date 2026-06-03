@@ -188,6 +188,108 @@ NUTRIENT_TRANSLATIONS: dict[str, str] = {
     "Malic acid": "苹果酸",
     "Oxalic acid": "草酸",
     "Phytosterols": "植物甾醇",
+
+    # ---- 生育酚和生育三烯酚（维生素E家族） ----
+    "Tocopherol, beta": "β-生育酚",
+    "Tocopherol, delta": "δ-生育酚",
+    "Tocopherol, gamma": "γ-生育酚",
+    "Tocotrienol, alpha": "α-生育三烯酚",
+    "Tocotrienol, beta": "β-生育三烯酚",
+    "Tocotrienol, delta": "δ-生育三烯酚",
+    "Tocotrienol, gamma": "γ-生育三烯酚",
+
+    # ---- 维生素D补充 ----
+    "Vitamin D (D2 + D3), International Units": "维生素D (IU)",
+    "Vitamin D4": "维生素D4",
+    "25-hydroxycholecalciferol": "25-羟基维生素D3",
+    "Vitamin K (Dihydrophylloquinone)": "维生素K（二氢叶绿醌）",
+    "Vitamin K (Menaquinone-4)": "维生素K2（甲萘醌-4）",
+    "Vitamin B-12, added": "维生素B12（添加）",
+    "Vitamin E, added": "维生素E（添加）",
+
+    # ---- 类胡萝卜素补充 ----
+    "Carotene, gamma": "γ-胡萝卜素",
+    "Cryptoxanthin, alpha": "α-隐黄素",
+    "Lutein": "叶黄素",
+    "Zeaxanthin": "玉米黄质",
+    "cis-Lutein/Zeaxanthin": "顺式叶黄素/玉米黄质",
+    "cis-Lycopene": "顺式番茄红素",
+    "cis-beta-Carotene": "顺式β-胡萝卜素",
+    "trans-Lycopene": "反式番茄红素",
+    "trans-beta-Carotene": "反式β-胡萝卜素",
+    "Phytoene": "八氢番茄红素",
+    "Phytofluene": "六氢番茄红素",
+
+    # ---- 氨基酸补充 ----
+    "Hydroxyproline": "羟脯氨酸",
+
+    # ---- 胆碱补充 ----
+    "Choline, free": "游离胆碱",
+    "Choline, from glycerophosphocholine": "甘油磷胆碱来源胆碱",
+    "Choline, from phosphocholine": "磷酸胆碱来源胆碱",
+    "Choline, from phosphotidyl choline": "磷脂酰胆碱来源胆碱",
+    "Choline, from sphingomyelin": "鞘磷脂来源胆碱",
+
+    # ---- 膳食纤维补充 ----
+    "Total dietary fiber (AOAC 2011.25)": "总膳食纤维 (AOAC 2011.25)",
+    "High Molecular Weight Dietary Fiber (HMWDF)": "高分子量膳食纤维",
+    "Low Molecular Weight Dietary Fiber (LMWDF)": "低分子量膳食纤维",
+
+    # ---- 碳水化合物/能量补充 ----
+    "Carbohydrate, by summation": "碳水化合物（求和法）",
+    "Energy (Atwater General Factors)": "热量（Atwater 通用系数）",
+    "Energy (Atwater Specific Factors)": "热量（Atwater 特定系数）",
+    "Total fat (NLEA)": "总脂肪 (NLEA)",
+    "Specific Gravity": "比重",
+
+    # ---- 有机酸补充 ----
+    "Pyruvic acid": "丙酮酸",
+    "Quinic acid": "奎宁酸",
+
+    # ---- 矿物质补充 ----
+    "Cobalt, Co": "钴",
+    "Nickel, Ni": "镍",
+    "Boron, B": "硼",
+
+    # ---- 植物甾醇 ----
+    "Beta-sitosterol": "β-谷固醇",
+    "Beta-sitostanol": "β-谷烷醇",
+    "Brassicasterol": "菜籽固醇",
+    "Campestanol": "菜烷醇",
+    "Campesterol": "菜固醇",
+    "Stigmasterol": "豆固醇",
+    "Stigmastadiene": "豆甾二烯",
+    "Phytosterols, other": "其他植物固醇",
+    "Delta-5-avenasterol": "Δ5-燕麦固醇",
+    "Delta-7-Stigmastenol": "Δ7-豆甾烷醇",
+    "Ergosta-5,7-dienol": "麦角甾-5,7-二烯醇",
+    "Ergosta-7,22-dienol": "麦角甾-7,22-二烯醇",
+    "Ergosta-7-enol": "麦角甾-7-烯醇",
+    "Ergosterol": "麦角固醇",
+
+    # ---- 大豆异黄酮 ----
+    "Daidzein": "大豆苷元",
+    "Daidzin": "大豆苷",
+    "Genistein": "染料木黄酮",
+    "Genistin": "染料木苷",
+    "Glycitin": "黄豆黄苷",
+
+    # ---- 其他 ----
+    "Beta-glucan": "β-葡聚糖",
+    "Glutathione": "谷胱甘肽",
+    "Ergothioneine": "麦角硫因",
+    "Raffinose": "棉子糖",
+    "Stachyose": "水苏糖",
+    "Verbascose": "毛蕊花糖",
+    "Resistant starch": "抗性淀粉",
+    "Galactose": "半乳糖",
+    "Maltodextrins": "麦芽糊精",
+    "Fatty acids, total trans-dienoic": "反式二烯脂肪酸",
+
+    # ---- 叶酸补充 ----
+    "10-Formyl folic acid (10HCOFA)": "10-甲酰叶酸",
+    "5-Formyltetrahydrofolic acid (5-HCOH4": "5-甲酰四氢叶酸",
+    "5-methyl tetrahydrofolate (5-MTHF)": "5-甲基四氢叶酸",
 }
 
 def _translate_fatty_acid(name: str) -> str | None:

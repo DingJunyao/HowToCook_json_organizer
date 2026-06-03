@@ -14,6 +14,8 @@ class NutritionTab(QWidget):
         super().__init__()
         self._manager: IngredientManager | None = None
         self._fm: FileManager | None = None
+        self._nm: NutritionMatcher | None = None
+        self._um = None  # UnitManager
         outer = QHBoxLayout(self)
 
         # 左栏 - 食材列表 + 工具按钮
@@ -28,6 +30,12 @@ class NutritionTab(QWidget):
         self._merge_btn = QPushButton("合并选中食材")
         self._merge_btn.clicked.connect(self._on_merge_clicked)
         left_layout.addWidget(self._merge_btn)
+
+        # 生成营养数据按钮
+        self._generate_btn = QPushButton("生成营养数据")
+        self._generate_btn.setToolTip("为所有已匹配 USDA 的食材生成营养信息到 out/nutritions.json")
+        self._generate_btn.clicked.connect(self._on_generate_clicked)
+        left_layout.addWidget(self._generate_btn)
 
         outer.addWidget(left_widget, 1)
 
@@ -51,7 +59,12 @@ class NutritionTab(QWidget):
         self._fm = fm
 
     def set_nutrition_matcher(self, matcher: NutritionMatcher) -> None:
+        self._nm = matcher
         self._panel.set_nutrition_matcher(matcher)
+
+    def set_unit_manager(self, unit_manager) -> None:
+        """设置 UnitManager 引用，用于营养数据生成时的单位标准化。"""
+        self._um = unit_manager
 
     def set_on_usda_import(self, callback: callable) -> None:
         self._panel.set_on_usda_import(callback)
@@ -95,6 +108,41 @@ class NutritionTab(QWidget):
             keep_name, remove_name = dialog.get_merge_params()
             self._manager.merge(keep_name, remove_name)
             self._refresh_all()
+
+    def _on_generate_clicked(self) -> None:
+        """生成营养数据并保存到 out/nutritions.json。"""
+        if self._manager is None or self._fm is None:
+            QMessageBox.warning(self, "无法生成", "请先设置食材管理器和文件管理器。")
+            return
+        if self._nm is None:
+            QMessageBox.warning(self, "无法生成", "请先加载 USDA 营养数据。")
+            return
+
+        try:
+            from src.managers.nutrition_generator import NutritionGenerator
+
+            generator = NutritionGenerator(self._nm, unit_manager=self._um)
+            all_ingredients = self._manager.get_all()
+            matched_count = sum(
+                1 for ing in all_ingredients if ing.usda_match_status == "matched"
+            )
+
+            if matched_count == 0:
+                QMessageBox.information(
+                    self, "无可生成数据", "没有已匹配 USDA 的食材。"
+                )
+                return
+
+            results = generator.generate_all(all_ingredients)
+            generator.save(self._fm, results)
+
+            QMessageBox.information(
+                self,
+                "生成完成",
+                f"已为 {len(results)} 个食材生成营养信息，保存到 out/nutritions.json",
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "生成失败", f"生成营养数据时出错：{e}")
 
     def _find_ingredient(self, key: str):
         if self._manager is None:

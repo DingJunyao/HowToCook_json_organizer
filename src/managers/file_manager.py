@@ -80,6 +80,14 @@ class FileManager:
             json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
         )
 
+    def save_nutritions(self, data: list) -> None:
+        """Save generated nutrition info to out/nutritions.json."""
+        path = self.output_dir / "out" / "nutritions.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
     def list_source_files(self) -> list[Path]:
         dishes_dir = self.source_dir / "dishes"
         if not dishes_dir.exists():
